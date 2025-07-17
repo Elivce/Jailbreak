@@ -157,42 +157,49 @@ end;
 
 --// function to interpolate characters position to a position
 
+--// function to check if player is already in a vehicle
+function utilities:is_in_vehicle()
+    if not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.SeatPart and humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+end
+
+--// Modified move_to_position function to use vehicle speed if in vehicle
 function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
     local vector_position = cframe.Position;
+    local current_speed = utilities:is_in_vehicle() and dependencies.variables.vehicle_speed or speed
     
-    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is an object above us, use pathfind function to get to a position with no collision above
+    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then
         movement:pathfind();
         task.wait(0.5);
     end;
     
     local y_level = 500;
-    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z); -- 500 studs above target position
+    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z);
 
-    repeat -- use velocity to move towards the target position
-        local velocity_unit = (higher_position - part.Position).Unit * speed;
+    repeat
+        local velocity_unit = (higher_position - part.Position).Unit * current_speed;
         part.Velocity = Vector3.new(velocity_unit.X, 0, velocity_unit.Z);
 
         task.wait();
 
         part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z);
 
-        if target_vehicle and target_vehicle.Seat.Player.Value then -- if someone occupies the vehicle while we're moving to it, we need to move to the next vehicle
+        if target_vehicle and target_vehicle.Seat.Player.Value then
             table.insert(tried_vehicles, target_vehicle);
-
             local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles);
             local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
 
             if vehicle_object then 
                 movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object);
             end;
-
             return;
         end;
     until (part.Position - higher_position).Magnitude < 10;
 
     part.CFrame = CFrame.new(part.Position.X, vector_position.Y, part.Position.Z);
     part.Velocity = Vector3.zero;
-end;
+end
 
 --// raycast filter
 
@@ -285,56 +292,50 @@ end);
 
 --// main teleport function (not returning a new function directly because of recursion)
 
-local function teleport(cframe, tried) -- unoptimized
+local function teleport(cframe, tried)
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
     local target_distance = relative_position.Magnitude;
 
     if target_distance <= 20 and not workspace:Raycast(player.Character.HumanoidRootPart.Position, relative_position.Unit * target_distance, dependencies.variables.raycast_params) then 
         player.Character.HumanoidRootPart.CFrame = cframe; 
-        
         return;
     end; 
 
-    local tried = tried or { };
+    local tried = tried or {};
     local nearest_vehicle = utilities:get_nearest_vehicle(tried);
     local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
+    local already_in_vehicle = utilities:is_in_vehicle()
 
     dependencies.variables.teleporting = true;
 
-    if vehicle_object then 
+    if vehicle_object and not already_in_vehicle then
         local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
 
-        if 1+1 == 3 then
-            print("lol")
-        else 
+        if vehicle_object.Seat.PlayerName.Value ~= player.Name then
+            movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
+
+            dependencies.variables.stopVelocity = true;
+
+            local enter_attempts = 1;
+            repeat
+                nearest_vehicle:Callback(true)
+                enter_attempts = enter_attempts + 1;
+                task.wait(0.1);
+            until enter_attempts == 10 or vehicle_object.Seat.PlayerName.Value == player.Name;
+
+            dependencies.variables.stopVelocity = false;
+
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
-                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
-
-                dependencies.variables.stopVelocity = true;
-
-                local enter_attempts = 1;
-
-                repeat -- attempt to enter car
-                    nearest_vehicle:Callback(true)
-                    
-                    enter_attempts = enter_attempts + 1;
-
-                    task.wait(0.1);
-                until enter_attempts == 10 or vehicle_object.Seat.PlayerName.Value == player.Name;
-
-                dependencies.variables.stopVelocity = false;
-
-                if vehicle_object.Seat.PlayerName.Value ~= player.Name then -- if it failed to enter, try a new car
-                    table.insert(tried, vehicle_object);
-
-                    return teleport(cframe, tried or { vehicle_object });
-                end;
+                table.insert(tried, vehicle_object);
+                return teleport(cframe, tried or {vehicle_object});
             end;
-
-            movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
         end;
+
+        movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
     else
-        movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
+        -- Use vehicle speed if already in a vehicle, otherwise use player speed
+        local speed = already_in_vehicle and dependencies.variables.vehicle_speed or dependencies.variables.player_speed
+        movement:move_to_position(player.Character.HumanoidRootPart, cframe, speed);
     end;
 
     task.wait(0.5);
