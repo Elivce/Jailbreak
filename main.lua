@@ -108,18 +108,6 @@ end;
 
 --// function to pathfind to a position with no collision above
 
--- Under Roof
-local function isUnderRoof(character)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = { character }
-    local upVector = Vector3.new(0, 500, 0)
-    local origin = character.HumanoidRootPart.Position
-    local result = workspace:Raycast(origin, upVector, raycastParams)
-    return result ~= nil -- returns true if something is above, false otherwise
-end
-
--- Update the movement functions to use isUnderRoof
 function movement:pathfind(tried)
     local distance = math.huge;
     local nearest;
@@ -152,8 +140,9 @@ function movement:pathfind(tried)
             
             player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0)); -- walking movement is less optimal
 
-            if not isUnderRoof(player.Character) then -- use the new isUnderRoof function
+            if not workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the player
                 utilities:toggle_door_collision(nearest.instance, true);
+
                 return;
             end;
 
@@ -166,11 +155,12 @@ function movement:pathfind(tried)
     movement:pathfind(tried);
 end;
 
--- Update the move_to_position function to use isUnderRoof
+--// function to interpolate characters position to a position
+
 function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
     local vector_position = cframe.Position;
     
-    if not car and isUnderRoof(player.Character) then -- use the new isUnderRoof function
+    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is an object above us, use pathfind function to get to a position with no collision above
         movement:pathfind();
         task.wait(0.5);
     end;
@@ -185,6 +175,19 @@ function movement:move_to_position(part, cframe, speed, car, target_vehicle, tri
         task.wait();
 
         part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z);
+
+        if target_vehicle and target_vehicle.Seat.Player.Value then -- if someone occupies the vehicle while we're moving to it, we need to move to the next vehicle
+            table.insert(tried_vehicles, target_vehicle);
+
+            local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles);
+            local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
+
+            if vehicle_object then 
+                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object);
+            end;
+
+            return;
+        end;
     until (part.Position - higher_position).Magnitude < 10;
 
     part.CFrame = CFrame.new(part.Position.X, vector_position.Y, part.Position.Z);
@@ -301,8 +304,8 @@ local function teleport(cframe, tried) -- unoptimized
     if vehicle_object then 
         local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
 
-        if 1+1 == 3 then -- if target position is closer than the nearest vehicle
-            print("Yes")
+        if target_distance < vehicle_distance then -- if target position is closer than the nearest vehicle
+            movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
                 movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
@@ -330,10 +333,10 @@ local function teleport(cframe, tried) -- unoptimized
 
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
 
-         --   repeat -- attempt to exit car
-           --     task.wait(0.15);
-           --     dependencies.modules.character_util.OnJump();
-        --    until vehicle_object.Seat.PlayerName.Value ~= player.Name;
+            repeat -- attempt to exit car
+                task.wait(0.15);
+                dependencies.modules.character_util.OnJump();
+            until vehicle_object.Seat.PlayerName.Value ~= player.Name;
         end;
     else
         movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
