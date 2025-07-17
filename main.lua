@@ -138,51 +138,41 @@ function movement:pathfind(tried)
 end;
 
 function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
-    local vector_position = cframe.Position
+    local vector_position = cframe.Position;
+    
+    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is an object above us, use pathfind function to get to a position with no collision above
+        movement:pathfind();
+        task.wait(0.5);
+    end;
+    
+    local y_level = 500;
+    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z); -- 500 studs above target position
 
-    if not car and not utilities:has_clear_sky(part.Position) then
-        movement:pathfind()
-        task.wait(0.5)
-    end
+    repeat -- use velocity to move towards the target position
+        local velocity_unit = (higher_position - part.Position).Unit * speed;
+        part.Velocity = Vector3.new(velocity_unit.X, 0, velocity_unit.Z);
 
-    local y_level = 500
-    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z)
+        task.wait();
 
-    -- Go up to high position
-    repeat
-        local velocity_unit = (higher_position - part.Position).Unit * speed
-        part.Velocity = Vector3.new(velocity_unit.X, 0, velocity_unit.Z)
+        part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z);
 
-        task.wait()
-        part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z)
+        if target_vehicle and target_vehicle.Seat.Player.Value then -- if someone occupies the vehicle while we're moving to it, we need to move to the next vehicle
+            table.insert(tried_vehicles, target_vehicle);
 
-        if target_vehicle and target_vehicle.Seat.Player.Value then
-            table.insert(tried_vehicles, target_vehicle)
+            local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles);
+            local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
 
-            local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles)
-            local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot
+            if vehicle_object then 
+                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object);
+            end;
 
-            if vehicle_object then
-                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object)
-            end
+            return;
+        end;
+    until (part.Position - higher_position).Magnitude < 10;
 
-            return
-        end
-    until (part.Position - higher_position).Magnitude < 10
-
-    -- Smooth descent
-    local descentTween = tween_service:Create(
-        part,
-        TweenInfo.new(1.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { Position = vector_position }
-    )
-
-    part.Velocity = Vector3.zero
-    descentTween:Play()
-    descentTween.Completed:Wait()
-
-    part.CFrame = CFrame.new(vector_position)
-end
+    part.CFrame = CFrame.new(part.Position.X, vector_position.Y, part.Position.Z);
+    part.Velocity = Vector3.zero;
+end;
 
 
 dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Blacklist;
