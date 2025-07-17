@@ -333,10 +333,10 @@ local function teleport(cframe, tried) -- unoptimized
 
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
 
-            --repeat -- attempt to exit car
-             --   task.wait(0.15);
-             --   dependencies.modules.character_util.OnJump();
-         --   until vehicle_object.Seat.PlayerName.Value ~= player.Name;
+         --   repeat -- attempt to exit car
+           --     task.wait(0.15);
+           --     dependencies.modules.character_util.OnJump();
+        --    until vehicle_object.Seat.PlayerName.Value ~= player.Name;
         end;
     else
         movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
