@@ -304,8 +304,8 @@ local function teleport(cframe, tried) -- unoptimized
     if vehicle_object then 
         local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
 
-        if target_distance < vehicle_distance then -- if target position is closer than the nearest vehicle
-            movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
+        if 1+1 == 3 then
+            print("Yes")
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
                 movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
@@ -332,11 +332,6 @@ local function teleport(cframe, tried) -- unoptimized
             end;
 
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
-
-            repeat -- attempt to exit car
-                task.wait(0.15);
-                dependencies.modules.character_util.OnJump();
-            until vehicle_object.Seat.PlayerName.Value ~= player.Name;
         end;
     else
         movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
