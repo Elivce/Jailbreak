@@ -108,6 +108,7 @@ end;
 
 --// function to pathfind to a position with no collision above
 
+--// function to pathfind to a position with no collision above
 function movement:pathfind(tried)
     local distance = math.huge;
     local nearest;
@@ -140,9 +141,13 @@ function movement:pathfind(tried)
             
             player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0)); -- walking movement is less optimal
 
-            if not workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the player
-                utilities:toggle_door_collision(nearest.instance, true);
+            local raycast_result = workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params);
+            if raycast_result then
+                print("Blocking object: " .. raycast_result.Instance.Name); -- Print the name of the blocking object
+            end
 
+            if not raycast_result then -- if there is nothing above the player
+                utilities:toggle_door_collision(nearest.instance, true);
                 return;
             end;
 
