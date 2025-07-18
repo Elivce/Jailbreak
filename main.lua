@@ -206,11 +206,14 @@ end
 dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Blacklist;
 dependencies.variables.raycast_params.FilterDescendantsInstances = { player.Character, workspace.Vehicles, workspace:FindFirstChild("Rain") };
 
-workspace.ChildAdded:Connect(function(child) -- if it starts raining, add rain to collision ignore list
-    if child.Name == "Rain" then 
-        table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, child);
-    end;
-end);
+workspace.ChildAdded:Connect(function(child)
+    -- List of weather objects to ignore
+    local weatherNames = {"Rain", "Snow", "Hail", "Fog", "Storm", "Clouds"}
+    
+    if table.find(weatherNames, child.Name) then
+        table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, child)
+    end
+end)
 
 player.CharacterAdded:Connect(function(character) -- when the player respawns, add character back to collision ignore list
     table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, character);
