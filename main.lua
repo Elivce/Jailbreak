@@ -294,7 +294,6 @@ task.spawn(function()
 end);
 
 --// main teleport function (not returning a new function directly because of recursion)
-
 local function teleport(cframe, tried)
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
     local target_distance = relative_position.Magnitude;
