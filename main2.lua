@@ -24,9 +24,9 @@ local Modules = {
 
 -- Configuration
 local Config = {
-    UpVector = Vector3.new(0, 500, 0),
+    UpVector = Vector3.new(0, 300, 0),
     PlayerSpeed = 120,
-    VehicleSpeed = 420,
+    VehicleSpeed = 400,
     MaxTeleportHeight = 1000,
     MinClearanceHeight = 50,
     PathfindingWaypointSpacing = 3
