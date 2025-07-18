@@ -220,9 +220,41 @@ workspace.ChildAdded:Connect(function(child)
     end
 end)
 
-player.CharacterAdded:Connect(function(character) -- when the player respawns, add character back to collision ignore list
+-- Add this at the beginning of your script or in the dependencies section
+local whitelisted_parts = {
+    "Head",
+    "RightLowerArm",
+    "RightHand",
+    "LeftLowerArm",
+    "LeftHand",
+    "HumanoidRootPart",
+    "Torso", -- Add any other parts you want to whitelist
+}
+
+-- Update the raycast filter
+dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Blacklist;
+dependencies.variables.raycast_params.FilterDescendantsInstances = { player.Character, workspace.Vehicles, workspace:FindFirstChild("Rain") };
+
+-- Add the whitelisted parts to the raycast filter
+for _, part_name in ipairs(whitelisted_parts) do
+    local part = player.Character:FindFirstChild(part_name)
+    if part then
+        table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, part)
+    end
+end
+
+-- You can also update the raycast filter dynamically when the character is added
+player.CharacterAdded:Connect(function(character)
     table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, character);
-end);
+    
+    -- Update the filter with the whitelisted parts
+    for _, part_name in ipairs(whitelisted_parts) do
+        local part = character:FindFirstChild(part_name)
+        if part then
+            table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, part)
+        end
+    end
+end)
 
 --// get free vehicles, owned helicopters, motorcycles and unsupported/new vehicles
 
