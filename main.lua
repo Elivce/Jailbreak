@@ -299,6 +299,7 @@ local function teleport(cframe, tried)
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
     local target_distance = relative_position.Magnitude;
 
+    -- First check if we can just teleport directly (short distance with no obstacles)
     if target_distance <= 20 and not workspace:Raycast(player.Character.HumanoidRootPart.Position, relative_position.Unit * target_distance, dependencies.variables.raycast_params) then 
         player.Character.HumanoidRootPart.CFrame = cframe; 
         return;
@@ -310,6 +311,15 @@ local function teleport(cframe, tried)
     local already_in_vehicle = utilities:is_in_vehicle()
 
     dependencies.variables.teleporting = true;
+
+    -- Check if we're under a roof and need to pathfind
+    local underRoof = isUnderRoof(player.Character)
+    
+    -- Only pathfind if we're under a roof AND not already in a vehicle
+    if underRoof and not already_in_vehicle then
+        movement:pathfind();
+        task.wait(0.5);
+    end
 
     if vehicle_object and not already_in_vehicle then
         local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
@@ -344,5 +354,20 @@ local function teleport(cframe, tried)
     task.wait(0.5);
     dependencies.variables.teleporting = false;
 end;
+
+-- Helper function to check if player is under a roof
+local function isUnderRoof(character)
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return false end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = { character, workspace.Vehicles, workspace:FindFirstChild("Rain") }
+    
+    local upVector = Vector3.new(0, 500, 0)
+    local origin = character.HumanoidRootPart.Position
+    local result = workspace:Raycast(origin, upVector, raycastParams)
+    
+    return result ~= nil -- returns true if something is above, false otherwise
+end
 
 return teleport;
