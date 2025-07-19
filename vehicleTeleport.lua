@@ -1,9 +1,8 @@
--- Jailbreak Teleport Script (Optimized)
--- Fixes player body whitelisting and pathfinding issues
+-- Jailbreak Teleport Script (Team Switching Version)
+-- Uses team switching instead of pathfinding to find clear positions
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local PathfindingService = game:GetService("PathfindingService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
@@ -28,8 +27,7 @@ local Config = {
     PlayerSpeed = 120,
     VehicleSpeed = 400,
     MaxTeleportHeight = 500,
-    MinClearanceHeight = 50,
-    PathfindingWaypointSpacing = 3
+    MinClearanceHeight = 50
 }
 
 -- Vehicle classifications
@@ -197,10 +195,13 @@ local function MoveToPosition(part, targetCFrame, speed, isVehicle, targetVehicl
     local targetPos = targetCFrame.Position
     local currentSpeed = (IsInVehicle() or isVehicle) and Config.VehicleSpeed or speed
     
-    -- Check if we need pathfinding (only if not in vehicle and position isn't clear)
+    -- Check if we need to find a clear position (using team switching)
     if not isVehicle and not IsPositionClear(part.Position) then
-        FindClearPosition()
-        task.wait(0.2)
+        -- Open team menu and switch teams to find clear position
+        teamMenu()
+        wait(1) -- Wait for menu to open
+        selectTeam("Prisoner") -- Switch to prisoner team
+        wait(1) -- Wait for team switch to complete
     end
     
     -- Calculate sky position
@@ -229,14 +230,6 @@ local function MoveToPosition(part, targetCFrame, speed, isVehicle, targetVehicl
     -- Descend to target
     part.CFrame = CFrame.new(part.Position.X, targetPos.Y, part.Position.Z)
     part.Velocity = Vector3.zero
-end
-
-local function FindClearPosition()
-    -- Instead of pathfinding, we will use the team selection functions
-    teamMenu()
-    wait(2)  -- Wait for the team menu to process
-    selectTeam("Prisoner")  -- Select the desired team
-    return true  -- Indicate that we have "found" a clear position
 end
 
 --[[
