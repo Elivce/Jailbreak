@@ -339,23 +339,17 @@ UpdateRaycastFilter()
 ]]
 
 return function(targetCFrame, triedVehicles)
-    if not Player.Character or not Player.Character:FindFirstChild("HumanoidRootPart") then
+    -- Wait for character if needed
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then
         return
     end
 
-    local rootPart = Player.Character.HumanoidRootPart
+    -- Reliable vehicle check
+    local inVehicle = Character:FindFirstChild("InVehicle") ~= nil
+    local currentVehicle = inVehicle and Character.Humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+    local rootPart = Character.HumanoidRootPart
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
-    local inVehicle = IsInVehicle()
-    local currentVehicle = nil
-
-    -- Improved vehicle detection
-    if Player.Character:FindFirstChild("Humanoid") then
-        local seat = Player.Character.Humanoid.SeatPart
-        if seat and seat:FindFirstAncestorOfClass("Model") then
-            currentVehicle = seat:FindFirstAncestorOfClass("Model")
-            inVehicle = true
-        end
-    end
 
     -- Short distance teleport (no vehicle needed)
     if distance <= 50 and IsPositionClear(rootPart.Position) then
@@ -373,39 +367,50 @@ return function(targetCFrame, triedVehicles)
 
     Teleporting = true
     triedVehicles = triedVehicles or {}
-    
-    -- Only look for vehicles if we're not in one
-    local nearestVehicle = not inVehicle and GetNearestVehicle(triedVehicles)
-    local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
 
-    if vehicleObj and not inVehicle then
-        -- Enter vehicle logic
-        MoveToPosition(rootPart, vehicleObj.Seat.CFrame, Config.PlayerSpeed, false, vehicleObj, triedVehicles)
+    if not inVehicle then
+        -- Vehicle entry logic
+        local nearestVehicle = GetNearestVehicle(triedVehicles)
+        local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
 
-        StopVelocity = true
-        local attempts = 0
-        
-        repeat
-            nearestVehicle:Callback(true)
-            attempts = attempts + 1
-            task.wait(0.1)
-        until attempts >= 10 or vehicleObj.Seat.PlayerName.Value == Player.Name
+        if vehicleObj then
+            -- Approach vehicle
+            MoveToPosition(rootPart, vehicleObj.Seat.CFrame, Config.PlayerSpeed, false, vehicleObj, triedVehicles)
 
-        StopVelocity = false
+            -- Attempt to enter vehicle
+            StopVelocity = true
+            local attempts = 0
+            repeat
+                nearestVehicle:Callback(true)
+                attempts = attempts + 1
+                task.wait(0.1)
+                -- Update vehicle status
+                inVehicle = Character:FindFirstChild("InVehicle") ~= nil
+            until attempts >= 10 or inVehicle
 
-        if vehicleObj.Seat.PlayerName.Value ~= Player.Name then
-            table.insert(triedVehicles, vehicleObj)
-            return teleport(targetCFrame, triedVehicles)
+            StopVelocity = false
+
+            if inVehicle then
+                -- Successfully entered - update current vehicle
+                currentVehicle = vehicleObj
+                -- Teleport the vehicle
+                MoveToPosition(currentVehicle.Engine, targetCFrame, Config.VehicleSpeed, true)
+                task.wait(0.5)
+                Teleporting = false
+                return
+            else
+                -- Failed to enter - try another vehicle
+                table.insert(triedVehicles, vehicleObj)
+                return teleport(targetCFrame, triedVehicles)
+            end
         end
-
-        -- Move vehicle to target - always use vehicle speed
-        MoveToPosition(vehicleObj.Engine, targetCFrame, Config.VehicleSpeed, true)
-    else
-        -- Direct teleport - use vehicle speed if in any vehicle (including Camaro)
-        local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
-        local partToMove = (currentVehicle and currentVehicle:FindFirstChild("Engine")) or rootPart
-        MoveToPosition(partToMove, targetCFrame, speed, inVehicle)
     end
+
+    -- Direct teleport with proper speed
+    local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
+    local partToMove = inVehicle and (currentVehicle and currentVehicle:FindFirstChild("Engine")) or rootPart
+    
+    MoveToPosition(partToMove or rootPart, targetCFrame, speed, inVehicle)
 
     task.wait(0.5)
     Teleporting = false
