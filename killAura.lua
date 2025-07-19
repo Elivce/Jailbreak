@@ -1,4 +1,5 @@
-getgenv().toggled = true -- Change this to false to stop kill aura.
+-----[[ KILL AURA SCRIPT ]]-----
+getgenv().toggled = true -- Kill aura will stay active even when arrested
 
 if getgenv().killauraloaded then return end
 
@@ -40,8 +41,8 @@ local function getNearestEnemy()
            v.Character:FindFirstChild("HumanoidRootPart") then
            
             local distance = (v.Character.HumanoidRootPart.Position - 
-                              game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                              
+                            game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                            
             if distance < nearestDistance then
                 nearestDistance, nearestEnemy = distance, v
             end
@@ -71,57 +72,50 @@ local function getPistol()
     game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
 end
 
-while wait(0.5) do
-    if getgenv().toggled == false then continue end
-    if not game:GetService("Players").LocalPlayer.Character then continue end
-    if not game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then continue end
-    
-    local nearestEnemy = getNearestEnemy()
-    
-    if nearestEnemy then
-        require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList = function(...)
-            local arg = {old(...)}
-            
-            if (tostring(getfenv(2).script) == "BulletEmitter" or tostring(getfenv(2).script) == "Taser") and 
-                nearestEnemy and 
-                nearestEnemy.Character and 
-                nearestEnemy.Character:FindFirstChild("HumanoidRootPart") and 
-                nearestEnemy.Character:FindFirstChild("Humanoid") and 
-                (nearestEnemy.Character.HumanoidRootPart.Position - 
-                 game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 600 and 
-                nearestEnemy.Character.Humanoid.Health > 0 then
+-- Modified kill aura loop that works even when arrested
+local function runKillAura()
+    while wait(0.5) do
+        if getgenv().toggled == false then continue end
+        if not game:GetService("Players").LocalPlayer.Character then continue end
+        
+        -- Check if we have a humanoid root part (works even when cuffed)
+        local rootPart = game:GetService("Players").LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then continue end
+        
+        local nearestEnemy = getNearestEnemy()
+        
+        if nearestEnemy then
+            require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList = function(...)
+                local arg = {old(...)}
                 
-                arg[1] = nearestEnemy.Character.HumanoidRootPart
-                arg[2] = nearestEnemy.Character.HumanoidRootPart.Position
+                if (tostring(getfenv(2).script) == "BulletEmitter" or tostring(getfenv(2).script) == "Taser") and 
+                    nearestEnemy and 
+                    nearestEnemy.Character and 
+                    nearestEnemy.Character:FindFirstChild("HumanoidRootPart") and 
+                    nearestEnemy.Character:FindFirstChild("Humanoid") and 
+                    (nearestEnemy.Character.HumanoidRootPart.Position - rootPart.Position).Magnitude < 600 and 
+                    nearestEnemy.Character.Humanoid.Health > 0 then
+                    
+                    arg[1] = nearestEnemy.Character.HumanoidRootPart
+                    arg[2] = nearestEnemy.Character.HumanoidRootPart.Position
+                end
+                
+                return unpack(arg)
             end
             
-            return unpack(arg)
-        end
-        
-        if not game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") then
-            getPistol()
-        end
-        
-        if game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") then
-            while game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") and 
-                  nearestEnemy and 
-                  nearestEnemy.Character and 
-                  nearestEnemy.Character:FindFirstChild("HumanoidRootPart") and 
-                  nearestEnemy.Character:FindFirstChild("Humanoid") and 
-                  (nearestEnemy.Character.HumanoidRootPart.Position - 
-                   game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 600 and 
-                  nearestEnemy.Character.Humanoid.Health > 0 do
-                  
+            -- Get pistol if we don't have one (works even when arrested)
+            if not game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") then
+                getPistol()
+            end
+            
+            -- Shoot if we have pistol (will work when cuffed)
+            if game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") then
                 game:GetService("Players").LocalPlayer.Folder.Pistol.InventoryEquipRemote:FireServer(true)
                 wait()
                 shoot()
             end
+        else
+            require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList = old
         end
-        
-        if game:GetService("Players").LocalPlayer.Folder:FindFirstChild("Pistol") then
-            game:GetService("Players").LocalPlayer.Folder.Pistol.InventoryEquipRemote:FireServer(false)
-        end
-    else
-        require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList = old
     end
 end
