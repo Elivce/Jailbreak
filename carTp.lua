@@ -346,9 +346,35 @@ return function(targetCFrame, triedVehicles)
     local rootPart = Player.Character.HumanoidRootPart
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
     local inVehicle = IsInVehicle()
+    local currentVehicle = nil
+
+    -- Improved vehicle detection
+    if Player.Character:FindFirstChild("Humanoid") then
+        local seat = Player.Character.Humanoid.SeatPart
+        if seat and seat:FindFirstAncestorOfClass("Model") then
+            currentVehicle = seat:FindFirstAncestorOfClass("Model")
+            inVehicle = true
+        end
+    end
+
+    -- Short distance teleport (no vehicle needed)
+    if distance <= 50 and IsPositionClear(rootPart.Position) then
+        local rayResult = workspace:Raycast(
+            rootPart.Position,
+            (targetCFrame.Position - rootPart.Position).Unit * distance,
+            RaycastParams
+        )
+        
+        if not rayResult then
+            rootPart.CFrame = targetCFrame
+            return
+        end
+    end
+
     Teleporting = true
     triedVehicles = triedVehicles or {}
     
+    -- Only look for vehicles if we're not in one
     local nearestVehicle = not inVehicle and GetNearestVehicle(triedVehicles)
     local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
 
@@ -372,12 +398,13 @@ return function(targetCFrame, triedVehicles)
             return teleport(targetCFrame, triedVehicles)
         end
 
-        -- Move vehicle to target - use vehicle speed
+        -- Move vehicle to target - always use vehicle speed
         MoveToPosition(vehicleObj.Engine, targetCFrame, Config.VehicleSpeed, true)
     else
-        -- Direct teleport - use appropriate speed based on vehicle status
+        -- Direct teleport - use vehicle speed if in any vehicle (including Camaro)
         local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
-        MoveToPosition(rootPart, targetCFrame, speed, inVehicle)
+        local partToMove = (currentVehicle and currentVehicle:FindFirstChild("Engine")) or rootPart
+        MoveToPosition(partToMove, targetCFrame, speed, inVehicle)
     end
 
     task.wait(0.5)
