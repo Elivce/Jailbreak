@@ -250,20 +250,6 @@ for index, value in next, workspace:GetDescendants() do
         end;
     end;
 end;
-
---// check if already in a car
-local function checkInCar()
-    local Players = game:GetService("Players")
-    local Player = Players.LocalPlayer
-    local Character = Player.Character or Player.CharacterAdded:Wait()
-
-    if Character:FindFirstChild("InVehicle") then
-        return true
-    else
-        return false
-    end
-end
-
 --// no fall damage or ragdoll 
 
 local old_is_point_in_tag = dependencies.modules.player_utils.isPointInTag;
@@ -314,7 +300,10 @@ local function teleport(cframe, tried) -- unoptimized
     dependencies.variables.teleporting = true;
     if vehicle_object then 
         local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
-        if checkInCar then
+        local Players = game:GetService("Players")
+        local Player = Players.LocalPlayer
+        local Character = Player.Character or Player.CharacterAdded:Wait()
+        if Character:FindFirstChild("InVehicle") then
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
