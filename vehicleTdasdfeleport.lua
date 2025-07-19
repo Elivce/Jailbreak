@@ -37,7 +37,7 @@ local Vehicles = {
     Helicopters = { Heli = true },
     Motorcycles = { Volt = true },
     FreeVehicles = { Camaro = true },
-    Unsupported = { SWATVan = true }
+    Unsupported = { SWATVan = true, Celestial = true }
 }
 
 -- Initialize raycast parameters
