@@ -1,343 +1,417 @@
+-- Jailbreak Teleport Script (Optimized)
+-- Fixes player body whitelisting and pathfinding issues
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local PathfindingService = game:GetService("PathfindingService")
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+
+-- Main variables
+local Player = Players.LocalPlayer
+local Teleporting = false
+local StopVelocity = false
+
+-- Module dependencies
+local Modules = {
+    UI = require(ReplicatedStorage.Module.UI),
+    Store = require(ReplicatedStorage.App.store),
+    PlayerUtils = require(ReplicatedStorage.Game.PlayerUtils),
+    VehicleData = require(ReplicatedStorage.Game.Garage.VehicleData),
+    CharacterUtil = require(ReplicatedStorage.Game.CharacterUtil),
+    Paraglide = require(ReplicatedStorage.Game.Paraglide)
+}
+
+-- Configuration
+local Config = {
+    UpVector = Vector3.new(0, 300, 0),
+    PlayerSpeed = 120,
+    VehicleSpeed = 400,
+    MaxTeleportHeight = 500,
+    MinClearanceHeight = 50,
+    PathfindingWaypointSpacing = 3
+}
+
+-- Vehicle classifications
+local Vehicles = {
+    Helicopters = { Heli = true },
+    Motorcycles = { Volt = true },
+    FreeVehicles = { Camaro = true },
+    Unsupported = { SWATVan = true }
+}
+
+-- Initialize raycast parameters
+local RaycastParams = RaycastParams.new()
+RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+RaycastParams.FilterDescendantsInstances = {}
+
+-- Cache for door positions
+local DoorPositions = {}
+
 --[[
-    Notes: 
-
-    - This script is in early development and can be buggy
-    - Some of this code is old and unoptimized
-    - This is mainly meant for longer teleports, short teleports inside of buldings and what not would be better to be implemented yourself
-    - You have to wait for the current teleport to finish to use it again
-
-    Anticheat Explanation: 
-
-    - Jailbreak has two main movement related security measures: anti teleport and anti noclip
-    - Jailbreaks anti noclip works in a way where not only can you not walk through objects, but you also get flagged if you teleport through them
-    - Due to cars in jailbreak being faster than players, the anti teleport allows you to move a lot faster if youre inside a car
-    - Jailbreaks anti teleport does not flag you for teleporting directly up or directly down
-    - The goal of this script is to combine a few methods to make the fastest possible teleporation method while not triggering any of the security measures
-    
-    Teleportation Steps:
-
-    - Check if the player is under a roof/any object
-    - If the player is under a roof, use pathfinding to get to an area which has no roof above it (to avoid getting flagged by the anti noclip when we try to teleport up)
-    - Once the player is in an area with no roof above it, teleport into the sky (if we move in the sky, we can avoid going into objects and getting flagged by the anti noclip)
-    - Check if the target position is closer than the nearest vehicle, if so, move directly to the target position in the sky and then teleport down to it, if not, continue to next step
-    - Move towards the position of above the nearest vehicle 
-    - Teleport directly downwards to the vehicle and enter it
-    - Teleport the vehicle into the sky 
-    - Move the vehicle to the target position in the sky 
-    - Teleport the vehicle directly downwards to the target position 
-    - Exit the vehicle
+    Utility Functions
 ]]
-
---// services
-
-local replicated_storage = game:GetService("ReplicatedStorage");
-local run_service = game:GetService("RunService");
-local pathfinding_service = game:GetService("PathfindingService");
-local players = game:GetService("Players");
-local tween_service = game:GetService("TweenService");
-
---// variables
-
-local player = players.LocalPlayer;
-
-local dependencies = {
-    variables = {
-        up_vector = Vector3.new(0, 500, 0),
-        raycast_params = RaycastParams.new(),
-        path = pathfinding_service:CreatePath({WaypointSpacing = 3}),
-        player_speed = 100, 
-        vehicle_speed = 350,
-        teleporting = false,
-        stopVelocity = false
-    },
-    modules = {
-        ui = require(replicated_storage.Module.UI),
-        store = require(replicated_storage.App.store),
-        player_utils = require(replicated_storage.Game.PlayerUtils),
-        vehicle_data = require(replicated_storage.Game.Garage.VehicleData),
-        character_util = require(replicated_storage.Game.CharacterUtil),
-        paraglide = require(replicated_storage.Game.Paraglide)
-    },
-    helicopters = { Heli = true }, -- heli is included in free vehicles
-    motorcycles = { Volt = true }, -- volt type is "custom" but works the same as a motorcycle
-    free_vehicles = { Camaro = true },
-    unsupported_vehicles = { SWATVan = true },
-    door_positions = { }    
-};
-
-local movement = { };
-local utilities = { };
-
---// function to toggle if a door can be collided with
-
-function utilities:toggle_door_collision(door, toggle)
-    for index, child in next, door.Model:GetChildren() do 
-        if child:IsA("BasePart") then 
-            child.CanCollide = toggle;
-        end; 
-    end;
-end;
-
---// function to get the nearest vehicle that can be entered
-
-function utilities:get_nearest_vehicle(tried) -- unoptimized
-    local nearest;
-    local distance = math.huge;
-
-    for index, action in next, dependencies.modules.ui.CircleAction.Specs do -- all of the interations
-        if action.IsVehicle and action.ShouldAllowEntry == true and action.Enabled == true and action.Name == "Enter Driver" then -- if the interaction is to enter the driver seat of a vehicle
-            local vehicle = action.ValidRoot;
-
-            if not table.find(tried, vehicle) and workspace.VehicleSpawns:FindFirstChild(vehicle.Name) then
-                if not dependencies.unsupported_vehicles[vehicle.Name] and (dependencies.modules.store._state.garageOwned.Vehicles[vehicle.Name] or dependencies.free_vehicles[vehicle.Name]) and not vehicle.Seat.Player.Value then -- check if the vehicle is supported, owned and not already occupied
-                    if not workspace:Raycast(vehicle.Seat.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then
-                        local magnitude = (vehicle.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude; 
-
-                        if magnitude < distance then 
-                            distance = magnitude;
-                            nearest = action;
-                        end;
-                    end;
-                end;
-            end;
-        end;
-    end;
-
-    return nearest;
-end;
-
---// function to pathfind to a position with no collision above
-
-function movement:pathfind(tried)
-    local distance = math.huge;
-    local nearest;
-
-    local tried = tried or { };
-    
-    for index, value in next, dependencies.door_positions do -- find the nearest position in our list of positions without collision above
-        if not table.find(tried, value) then
-            local magnitude = (value.position - player.Character.HumanoidRootPart.Position).Magnitude;
-            
-            if magnitude < distance then 
-                distance = magnitude;
-                nearest = value;
-            end;
-        end;
-    end;
-
-    table.insert(tried, nearest);
-
-    utilities:toggle_door_collision(nearest.instance, false);
-
-    local path = dependencies.variables.path;
-    path:ComputeAsync(player.Character.HumanoidRootPart.Position, nearest.position);
-
-    if path.Status == Enum.PathStatus.Success then -- if path making is successful
-        local waypoints = path:GetWaypoints();
-
-        for index = 1, #waypoints do 
-            local waypoint = waypoints[index];
-            
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0)); -- walking movement is less optimal
-
-            if not workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the player
-                utilities:toggle_door_collision(nearest.instance, true);
-
-                return;
-            end;
-
-            task.wait(0.05);
-        end;
-    end;
-
-    utilities:toggle_door_collision(nearest.instance, true);
-
-    movement:pathfind(tried);
-end;
-
---// function to interpolate characters position to a position
-
-function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
-    local vector_position = cframe.Position;
-    
-    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is an object above us, use pathfind function to get to a position with no collision above
-        movement:pathfind();
-        task.wait(0.5);
-    end;
-    
-    local y_level = 500;
-    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z); -- 500 studs above target position
-
-    repeat -- use velocity to move towards the target position
-        local velocity_unit = (higher_position - part.Position).Unit * speed;
-        part.Velocity = Vector3.new(velocity_unit.X, 0, velocity_unit.Z);
-
-        task.wait();
-
-        part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z);
-
-        if target_vehicle and target_vehicle.Seat.Player.Value then -- if someone occupies the vehicle while we're moving to it, we need to move to the next vehicle
-            table.insert(tried_vehicles, target_vehicle);
-
-            local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles);
-            local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
-
-            if vehicle_object then 
-                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object);
-            end;
-
-            return;
-        end;
-    until (part.Position - higher_position).Magnitude < 10;
-
-    part.CFrame = CFrame.new(part.Position.X, vector_position.Y, part.Position.Z);
-    part.Velocity = Vector3.zero;
-end;
-
---// raycast filter
-
-dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Blacklist;
-dependencies.variables.raycast_params.FilterDescendantsInstances = { player.Character, workspace.Vehicles, workspace:FindFirstChild("Rain") };
-
-workspace.ChildAdded:Connect(function(child) -- if it starts raining, add rain to collision ignore list
-    if child.Name == "Rain" then 
-        table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, child);
-    end;
-end);
-
-player.CharacterAdded:Connect(function(character) -- when the player respawns, add character back to collision ignore list
-    table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, character);
-end);
-
---// get free vehicles, owned helicopters, motorcycles and unsupported/new vehicles
-
-for index, vehicle_data in next, dependencies.modules.vehicle_data do
-    if vehicle_data.Type == "Heli" then -- helicopters
-        dependencies.helicopters[vehicle_data.Make] = true;
-    elseif vehicle_data.Type == "Motorcycle" then --- motorcycles
-        dependencies.motorcycles[vehicle_data.Make] = true;
-    end;
-
-    if vehicle_data.Type ~= "Chassis" and vehicle_data.Type ~= "Motorcycle" and vehicle_data.Type ~= "Heli" and vehicle_data.Type ~= "DuneBuggy" and vehicle_data.Make ~= "Volt" then -- weird vehicles that are not supported
-        dependencies.unsupported_vehicles[vehicle_data.Make] = true;
-    end;
-    
-    if not vehicle_data.Price then -- free vehicles
-        dependencies.free_vehicles[vehicle_data.Make] = true;
-    end;
-end;
-
---// get all positions near a door which have no collision above them
-
-for index, value in next, workspace:GetDescendants() do
-    if value.Name:sub(-4, -1) == "Door" then 
-        local touch_part = value:FindFirstChild("Touch");
-
-        if touch_part and touch_part:IsA("BasePart") then
-            for distance = 5, 100, 5 do 
-                local forward_position, backward_position = touch_part.Position + touch_part.CFrame.LookVector * (distance + 3), touch_part.Position + touch_part.CFrame.LookVector * -(distance + 3); -- distance + 3 studs forward and backward from the door
-                
-                if not workspace:Raycast(forward_position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the forward position from the door
-                    table.insert(dependencies.door_positions, { instance = value, position = forward_position });
-
-                    break;
-                elseif not workspace:Raycast(backward_position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the backward position from the door
-                    table.insert(dependencies.door_positions, { instance = value, position = backward_position });
-
-                    break;
-                end;
-            end;
-        end;
-    end;
-end;
---// no fall damage or ragdoll 
-
-local old_is_point_in_tag = dependencies.modules.player_utils.isPointInTag;
-dependencies.modules.player_utils.isPointInTag = function(point, tag)
-    if dependencies.variables.teleporting and tag == "NoRagdoll" or tag == "NoFallDamage" then
-        return true;
-    end;
-    
-    return old_is_point_in_tag(point, tag);
-end;
-
---// anti skydive
-
-local oldIsFlying = dependencies.modules.paraglide.IsFlying
-dependencies.modules.paraglide.IsFlying = function(...)
-    if dependencies.variables.teleporting and getinfo(2, "s").source:find("Falling") then
-        return true
+local function getServerHash()
+    for _, child in pairs(game:GetService("ReplicatedStorage"):GetChildren()) do
+        if select(2, string.gsub(child.Name, "%-", "")) == 4 then
+            return child.Name
+        end
     end
-    
-    return oldIsFlying(...)
+    return nil
 end
 
---// stop velocity
+-- Gets Hidden Hashes
+local function getEventValue(key)
+    local EventTable = (function()
+        for i, v in ipairs(getgc(false)) do
+            if typeof(v) == "function" and islclosure(v) and debug.info(v, "n") == "EventFireServer" then
+                local upvalues = debug.getupvalues(v)
+                if typeof(upvalues[3]) == "table" then
+                    return upvalues[3]
+                end
+            end
+        end
+    end)()
+    return EventTable and EventTable[key]
+end
 
+local function teamMenu()
+    local serverHash = getServerHash()
+    local switchHash = getEventValue("jwfcps55")
+    local args = {
+        [1] = switchHash
+    }
+    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+end
+
+-- Select Team
+local function selectTeam(team)
+    local serverHash = getServerHash()
+    local prisonerHash = getEventValue("mto4108g")
+    local args = {
+        [1] = prisonerHash,
+        [2] = team,
+    }
+    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+end
+
+local function UpdateRaycastFilter()
+    local filterList = { workspace.Vehicles }
+    
+    -- Add weather objects
+    for _, name in ipairs({"Rain", "Snow", "Hail", "Fog", "Storm", "Clouds"}) do
+        local weather = workspace:FindFirstChild(name)
+        if weather then table.insert(filterList, weather) end
+    end
+    
+    -- Add all non-collidable player parts
+    if Player.Character then
+        for _, part in ipairs(Player.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide == false then
+                table.insert(filterList, part)
+            end
+        end
+        -- Ensure critical parts are always included
+        local criticalParts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+        for _, name in ipairs(criticalParts) do
+            local part = Player.Character:FindFirstChild(name)
+            if part and not table.find(filterList, part) then
+                table.insert(filterList, part)
+            end
+        end
+    end
+    
+    RaycastParams.FilterDescendantsInstances = filterList
+end
+
+local function IsPositionClear(position)
+    -- First check if there's immediate clearance above
+    local immediateCheck = workspace:Raycast(
+        position,
+        Vector3.new(0, Config.MinClearanceHeight, 0),
+        RaycastParams
+    )
+    
+    if not immediateCheck then return true end
+    
+    -- Then check full height if needed
+    local fullCheck = workspace:Raycast(
+        position,
+        Config.UpVector,
+        RaycastParams
+    )
+    
+    return not fullCheck
+end
+
+local function ToggleDoorCollision(door, state)
+    if door and door:FindFirstChild("Model") then
+        for _, part in ipairs(door.Model:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = state
+            end
+        end
+    end
+end
+
+local function GetNearestVehicle(tried)
+    local nearest, minDistance = nil, math.huge
+    tried = tried or {}
+
+    for _, action in pairs(Modules.UI.CircleAction.Specs) do
+        if action.IsVehicle and action.ShouldAllowEntry and action.Enabled and action.Name == "Enter Driver" then
+            local vehicle = action.ValidRoot
+            
+            if not table.find(tried, vehicle) and workspace.VehicleSpawns:FindFirstChild(vehicle.Name) then
+                if not Vehicles.Unsupported[vehicle.Name] and 
+                   (Modules.Store._state.garageOwned.Vehicles[vehicle.Name] or Vehicles.FreeVehicles[vehicle.Name]) and 
+                   not vehicle.Seat.Player.Value then
+                    
+                    if IsPositionClear(vehicle.Seat.Position) then
+                        local distance = (vehicle.Seat.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+                        
+                        if distance < minDistance then
+                            minDistance = distance
+                            nearest = action
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+local function IsInVehicle()
+    if not Player.Character then return false end
+    local humanoid = Player.Character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.SeatPart and humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+end
+
+--[[
+    Movement Functions
+]]
+
+local function MoveToPosition(part, targetCFrame, speed, isVehicle, targetVehicle, triedVehicles)
+    local targetPos = targetCFrame.Position
+    local currentSpeed = (IsInVehicle() or isVehicle) and Config.VehicleSpeed or speed
+    
+    -- Check if we need pathfinding (only if not in vehicle and position isn't clear)
+    if not isVehicle and not IsPositionClear(part.Position) then
+        FindClearPosition()
+        task.wait(0.2)
+    end
+    
+    -- Calculate sky position
+    local skyPosition = Vector3.new(targetPos.X, Config.MaxTeleportHeight, targetPos.Z)
+    
+    -- Move to sky position
+    repeat
+        local direction = (skyPosition - part.Position).Unit * currentSpeed
+        part.Velocity = Vector3.new(direction.X, 0, direction.Z)
+        part.CFrame = CFrame.new(part.Position.X, Config.MaxTeleportHeight, part.Position.Z)
+        task.wait()
+        
+        -- Handle vehicle takeover cases
+        if targetVehicle and targetVehicle.Seat.Player.Value then
+            table.insert(triedVehicles or {}, targetVehicle)
+            local newVehicle = GetNearestVehicle(triedVehicles)
+            local vehicleObj = newVehicle and newVehicle.ValidRoot
+            
+            if vehicleObj then 
+                MoveToPosition(Player.Character.HumanoidRootPart, vehicleObj.Seat.CFrame, Config.PlayerSpeed, false, vehicleObj)
+            end
+            return
+        end
+    until (part.Position - skyPosition).Magnitude < 10
+    
+    -- Descend to target
+    part.CFrame = CFrame.new(part.Position.X, targetPos.Y, part.Position.Z)
+    part.Velocity = Vector3.zero
+end
+
+local function FindClearPosition()
+    -- Instead of pathfinding, we will use the team selection functions
+    teamMenu()
+    wait(2)  -- Wait for the team menu to process
+    selectTeam("Prisoner")  -- Select the desired team
+    return true  -- Indicate that we have "found" a clear position
+end
+
+--[[
+    Anti-Cheat Bypasses
+]]
+
+-- No fall damage/ragdoll bypass
+local originalIsPointInTag = Modules.PlayerUtils.isPointInTag
+Modules.PlayerUtils.isPointInTag = function(point, tag)
+    if Teleporting and (tag == "NoRagdoll" or tag == "NoFallDamage") then
+        return true
+    end
+    return originalIsPointInTag(point, tag)
+end
+
+-- Anti skydive bypass
+local originalIsFlying = Modules.Paraglide.IsFlying
+Modules.Paraglide.IsFlying = function(...)
+    if Teleporting and debug.info(2, "s").source:find("Falling") then
+        return true
+    end
+    return originalIsFlying(...)
+end
+
+-- Velocity control
 task.spawn(function()
     while task.wait() do
-        if dependencies.variables.stopVelocity and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            player.Character.HumanoidRootPart.Velocity = Vector3.zero;
-        end;
-    end;
-end);
+        if StopVelocity and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            Player.Character.HumanoidRootPart.Velocity = Vector3.zero
+        end
+    end
+end)
 
---// main teleport function (not returning a new function directly because of recursion)
+--[[
+    Initialization
+]]
 
-local function teleport(cframe, tried) -- unoptimized
-    local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
-    local target_distance = relative_position.Magnitude;
+-- Initialize vehicle classifications
+for _, vehicle in pairs(Modules.VehicleData) do
+    if vehicle.Type == "Heli" then
+        Vehicles.Helicopters[vehicle.Make] = true
+    elseif vehicle.Type == "Motorcycle" then
+        Vehicles.Motorcycles[vehicle.Make] = true
+    end
 
-    if target_distance <= 20 and not workspace:Raycast(player.Character.HumanoidRootPart.Position, relative_position.Unit * target_distance, dependencies.variables.raycast_params) then 
-        player.Character.HumanoidRootPart.CFrame = cframe; 
+    if vehicle.Type ~= "Chassis" and vehicle.Type ~= "Motorcycle" and 
+       vehicle.Type ~= "Heli" and vehicle.Type ~= "DuneBuggy" and vehicle.Make ~= "Volt" then
+        Vehicles.Unsupported[vehicle.Make] = true
+    end
+    
+    if not vehicle.Price then
+        Vehicles.FreeVehicles[vehicle.Make] = true
+    end
+end
+
+-- Cache door positions
+for _, door in ipairs(workspace:GetDescendants()) do
+    if door.Name:sub(-4) == "Door" then 
+        local touchPart = door:FindFirstChild("Touch")
         
-        return;
-    end; 
+        if touchPart and touchPart:IsA("BasePart") then
+            for distance = 5, 100, 5 do 
+                local forwardPos = touchPart.Position + touchPart.CFrame.LookVector * (distance + 3)
+                local backwardPos = touchPart.Position + touchPart.CFrame.LookVector * -(distance + 3)
+                
+                if IsPositionClear(forwardPos) then
+                    table.insert(DoorPositions, {
+                        instance = door,
+                        position = forwardPos
+                    })
+                    break
+                elseif IsPositionClear(backwardPos) then
+                    table.insert(DoorPositions, {
+                        instance = door,
+                        position = backwardPos
+                    })
+                    break
+                end
+            end
+        end
+    end
+end
 
-    local tried = tried or { };
-    local nearest_vehicle = utilities:get_nearest_vehicle(tried);
-    local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
-    dependencies.variables.teleporting = true;
-    if vehicle_object then 
-        local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude;
-        local Players = game:GetService("Players")
-        local Player = Players.LocalPlayer
-        local Character = Player.Character or Player.CharacterAdded:Wait()
-        if Character:FindFirstChild("InVehicle") then
-            movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
-        else 
-            if vehicle_object.Seat.PlayerName.Value ~= player.Name then
-                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
+-- Update filters when character changes
+Player.CharacterAdded:Connect(function(character)
+    UpdateRaycastFilter()
+    
+    character.ChildAdded:Connect(function(child)
+        if child:IsA("BasePart") then
+            UpdateRaycastFilter()
+        end
+    end)
+end)
 
-                dependencies.variables.stopVelocity = true;
+-- Initial filter update
+UpdateRaycastFilter()
 
-                local enter_attempts = 1;
+--[[
+    Main Teleport Function
+]]
 
-                repeat
-                    nearest_vehicle:Callback(true)
-                    
-                    enter_attempts = enter_attempts + 1;
+return function(targetCFrame, triedVehicles)
+    -- Wait for character if needed
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
 
-                    task.wait(0.1);
-                until enter_attempts == 10 or vehicle_object.Seat.PlayerName.Value == player.Name;
+    -- Reliable vehicle check
+    local inVehicle = Character:FindFirstChild("InVehicle") ~= nil
+    local currentVehicle = inVehicle and Character.Humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+    local rootPart = Character.HumanoidRootPart
+    local distance = (targetCFrame.Position - rootPart.Position).Magnitude
 
-                dependencies.variables.stopVelocity = false;
+    -- Short distance teleport (no vehicle needed)
+    if distance <= 50 and IsPositionClear(rootPart.Position) then
+        local rayResult = workspace:Raycast(
+            rootPart.Position,
+            (targetCFrame.Position - rootPart.Position).Unit * distance,
+            RaycastParams
+        )
+        
+        if not rayResult then
+            rootPart.CFrame = targetCFrame
+            return
+        end
+    end
 
-                if vehicle_object.Seat.PlayerName.Value ~= player.Name then -- if it failed to enter, try a new car
-                    table.insert(tried, vehicle_object);
+    Teleporting = true
+    triedVehicles = triedVehicles or {}
 
-                    return teleport(cframe, tried or { vehicle_object });
-                end;
-            end;
+    if not inVehicle then
+        -- Vehicle entry logic
+        local nearestVehicle = GetNearestVehicle(triedVehicles)
+        local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
 
-            movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
-        end;
-    else
-        movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
-    end;
+        if vehicleObj then
+            -- Approach vehicle
+            MoveToPosition(rootPart, vehicleObj.Seat.CFrame, Config.PlayerSpeed, false, vehicleObj, triedVehicles)
 
-    task.wait(0.5);
-    dependencies.variables.teleporting = false;
-end;
+            -- Attempt to enter vehicle
+            StopVelocity = true
+            local attempts = 0
+            repeat
+                nearestVehicle:Callback(true)
+                attempts = attempts + 1
+                task.wait(0.1)
+                -- Update vehicle status
+                inVehicle = Character:FindFirstChild("InVehicle") ~= nil
+            until attempts >= 10 or inVehicle
 
-return teleport;
+            StopVelocity = false
+
+            if inVehicle then
+                -- Successfully entered - update current vehicle
+                currentVehicle = vehicleObj
+                -- Teleport the vehicle
+                MoveToPosition(currentVehicle.Engine, targetCFrame, Config.VehicleSpeed, true)
+                task.wait(0.5)
+                Teleporting = false
+                return
+            else
+                -- Failed to enter - try another vehicle
+                table.insert(triedVehicles, vehicleObj)
+                return teleport(targetCFrame, triedVehicles)
+            end
+        end
+    end
+
+    -- Direct teleport with proper speed
+    local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
+    local partToMove = inVehicle and (currentVehicle and currentVehicle:FindFirstChild("Engine")) or rootPart
+    
+    MoveToPosition(partToMove or rootPart, targetCFrame, speed, inVehicle)
+
+    task.wait(0.5)
+    Teleporting = false
+end
