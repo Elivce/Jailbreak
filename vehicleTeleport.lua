@@ -345,9 +345,22 @@ return function(targetCFrame, triedVehicles)
         return
     end
 
-    -- Reliable vehicle check
-    local inVehicle = Character:FindFirstChild("InVehicle") ~= nil
-    local currentVehicle = inVehicle and Character.Humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+    -- Ultra-reliable vehicle check with multiple fallbacks
+    local inVehicle = false
+    local currentVehicle = nil
+    local humanoid = Character:FindFirstChildOfClass("Humanoid")
+    
+    if Character:FindFirstChild("InVehicle") then
+        inVehicle = true
+        if humanoid and humanoid.SeatPart then
+            currentVehicle = humanoid.SeatPart:FindFirstAncestorWhichIsA("Model")
+        end
+    elseif humanoid and humanoid.SeatPart then
+        -- Fallback check for games where InVehicle doesn't exist
+        inVehicle = true
+        currentVehicle = humanoid.SeatPart:FindFirstAncestorWhichIsA("Model")
+    end
+
     local rootPart = Character.HumanoidRootPart
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
 
@@ -373,7 +386,7 @@ return function(targetCFrame, triedVehicles)
         local nearestVehicle = GetNearestVehicle(triedVehicles)
         local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
 
-        if vehicleObj then
+        if vehicleObj and vehicleObj:FindFirstChild("Seat") then
             -- Approach vehicle
             MoveToPosition(rootPart, vehicleObj.Seat.CFrame, Config.PlayerSpeed, false, vehicleObj, triedVehicles)
 
@@ -381,36 +394,49 @@ return function(targetCFrame, triedVehicles)
             StopVelocity = true
             local attempts = 0
             repeat
-                nearestVehicle:Callback(true)
+                if nearestVehicle and nearestVehicle.Callback then
+                    nearestVehicle:Callback(true)
+                end
                 attempts = attempts + 1
                 task.wait(0.1)
-                -- Update vehicle status
-                inVehicle = Character:FindFirstChild("InVehicle") ~= nil
+                -- Update vehicle status using multiple methods
+                inVehicle = Character:FindFirstChild("InVehicle") or 
+                          (humanoid and humanoid.SeatPart ~= nil)
             until attempts >= 10 or inVehicle
 
             StopVelocity = false
 
             if inVehicle then
                 -- Successfully entered - update current vehicle
-                currentVehicle = vehicleObj
-                -- Teleport the vehicle
-                MoveToPosition(currentVehicle.Engine, targetCFrame, Config.VehicleSpeed, true)
-                task.wait(0.5)
-                Teleporting = false
-                return
+                if humanoid and humanoid.SeatPart then
+                    currentVehicle = humanoid.SeatPart:FindFirstAncestorWhichIsA("Model")
+                end
+                -- Teleport the vehicle if we found it
+                if currentVehicle and currentVehicle:FindFirstChild("Engine") then
+                    MoveToPosition(currentVehicle.Engine, targetCFrame, Config.VehicleSpeed, true)
+                    task.wait(0.5)
+                    Teleporting = false
+                    return
+                end
             else
                 -- Failed to enter - try another vehicle
-                table.insert(triedVehicles, vehicleObj)
+                if vehicleObj then
+                    table.insert(triedVehicles, vehicleObj)
+                end
                 return teleport(targetCFrame, triedVehicles)
             end
         end
     end
 
-    -- Direct teleport with proper speed
+    -- Direct teleport with maximum reliability
     local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
-    local partToMove = inVehicle and (currentVehicle and currentVehicle:FindFirstChild("Engine")) or rootPart
+    local partToMove = rootPart
     
-    MoveToPosition(partToMove or rootPart, targetCFrame, speed, inVehicle)
+    if inVehicle and currentVehicle then
+        partToMove = currentVehicle:FindFirstChild("Engine") or rootPart
+    end
+
+    MoveToPosition(partToMove, targetCFrame, speed, inVehicle)
 
     task.wait(0.5)
     Teleporting = false
