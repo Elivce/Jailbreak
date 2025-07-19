@@ -363,21 +363,6 @@ return function(targetCFrame, triedVehicles)
 
     local rootPart = Character.HumanoidRootPart
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
-
-    -- Short distance teleport (no vehicle needed)
-    if distance <= 50 and IsPositionClear(rootPart.Position) then
-        local rayResult = workspace:Raycast(
-            rootPart.Position,
-            (targetCFrame.Position - rootPart.Position).Unit * distance,
-            RaycastParams
-        )
-        
-        if not rayResult then
-            rootPart.CFrame = targetCFrame
-            return
-        end
-    end
-
     Teleporting = true
     triedVehicles = triedVehicles or {}
 
