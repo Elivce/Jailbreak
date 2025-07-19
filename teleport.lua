@@ -27,7 +27,7 @@ local Config = {
     UpVector = Vector3.new(0, 300, 0),
     PlayerSpeed = 120,
     VehicleSpeed = 400,
-    MaxTeleportHeight = 750,
+    MaxTeleportHeight = 500,
     MinClearanceHeight = 50,
     PathfindingWaypointSpacing = 3
 }
@@ -51,6 +51,49 @@ local DoorPositions = {}
 --[[
     Utility Functions
 ]]
+local function getServerHash()
+    for _, child in pairs(game:GetService("ReplicatedStorage"):GetChildren()) do
+        if select(2, string.gsub(child.Name, "%-", "")) == 4 then
+            return child.Name
+        end
+    end
+    return nil
+end
+
+-- Gets Hidden Hashes
+local function getEventValue(key)
+    local EventTable = (function()
+        for i, v in ipairs(getgc(false)) do
+            if typeof(v) == "function" and islclosure(v) and debug.info(v, "n") == "EventFireServer" then
+                local upvalues = debug.getupvalues(v)
+                if typeof(upvalues[3]) == "table" then
+                    return upvalues[3]
+                end
+            end
+        end
+    end)()
+    return EventTable and EventTable[key]
+end
+
+local function teamMenu()
+    local serverHash = getServerHash()
+    local switchHash = getEventValue("jwfcps55")
+    local args = {
+        [1] = switchHash
+    }
+    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+end
+
+-- Select Team
+local function selectTeam(team)
+    local serverHash = getServerHash()
+    local prisonerHash = getEventValue("mto4108g")
+    local args = {
+        [1] = prisonerHash,
+        [2] = team,
+    }
+    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+end
 
 local function UpdateRaycastFilter()
     local filterList = { workspace.Vehicles }
@@ -188,53 +231,12 @@ local function MoveToPosition(part, targetCFrame, speed, isVehicle, targetVehicl
     part.Velocity = Vector3.zero
 end
 
-local function FindClearPosition(tried)
-    -- First try simple upward movement
-    if IsPositionClear(Player.Character.HumanoidRootPart.Position) then
-        return true
-    end
-    
-    -- If not clear, find nearest door position
-    local nearest, minDistance = nil, math.huge
-    tried = tried or {}
-    
-    for _, doorData in ipairs(DoorPositions) do
-        if not table.find(tried, doorData) then
-            local distance = (doorData.position - Player.Character.HumanoidRootPart.Position).Magnitude
-            if distance < minDistance then
-                minDistance = distance
-                nearest = doorData
-            end
-        end
-    end
-    
-    if not nearest then return false end
-    
-    table.insert(tried, nearest)
-    ToggleDoorCollision(nearest.instance, false)
-    
-    -- Create path
-    local path = PathfindingService:CreatePath({
-        WaypointSpacing = Config.PathfindingWaypointSpacing
-    })
-    
-    path:ComputeAsync(Player.Character.HumanoidRootPart.Position, nearest.position)
-    
-    if path.Status == Enum.PathStatus.Success then
-        for _, waypoint in ipairs(path:GetWaypoints()) do
-            Player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 3, 0))
-            
-            if IsPositionClear(Player.Character.HumanoidRootPart.Position) then
-                ToggleDoorCollision(nearest.instance, true)
-                return true
-            end
-            
-            task.wait(0.05)
-        end
-    end
-    
-    ToggleDoorCollision(nearest.instance, true)
-    return FindClearPosition(tried)
+local function FindClearPosition()
+    -- Instead of pathfinding, we will use the team selection functions
+    teamMenu()
+    wait(2)  -- Wait for the team menu to process
+    selectTeam("Prisoner")  -- Select the desired team
+    return true  -- Indicate that we have "found" a clear position
 end
 
 --[[
