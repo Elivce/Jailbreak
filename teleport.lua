@@ -195,7 +195,7 @@ end
 
 local function MoveToPosition(part, targetCFrame, speed, isVehicle, targetVehicle, triedVehicles)
     local targetPos = targetCFrame.Position
-    local currentSpeed = IsInVehicle() and Config.VehicleSpeed or speed
+    local currentSpeed = (IsInVehicle() or isVehicle) and Config.VehicleSpeed or speed
     
     -- Check if we need pathfinding (only if not in vehicle and position isn't clear)
     if not isVehicle and not IsPositionClear(part.Position) then
@@ -345,27 +345,12 @@ return function(targetCFrame, triedVehicles)
 
     local rootPart = Player.Character.HumanoidRootPart
     local distance = (targetCFrame.Position - rootPart.Position).Magnitude
-
-    -- Short distance teleport (no vehicle needed)
-    if distance <= 50 and IsPositionClear(rootPart.Position) then
-        local rayResult = workspace:Raycast(
-            rootPart.Position,
-            (targetCFrame.Position - rootPart.Position).Unit * distance,
-            RaycastParams
-        )
-        
-        if not rayResult then
-            rootPart.CFrame = targetCFrame
-            return
-        end
-    end
-
+    local inVehicle = IsInVehicle()
     Teleporting = true
     triedVehicles = triedVehicles or {}
     
-    local nearestVehicle = GetNearestVehicle(triedVehicles)
+    local nearestVehicle = not inVehicle and GetNearestVehicle(triedVehicles)
     local vehicleObj = nearestVehicle and nearestVehicle.ValidRoot
-    local inVehicle = IsInVehicle()
 
     if vehicleObj and not inVehicle then
         -- Enter vehicle logic
@@ -387,11 +372,12 @@ return function(targetCFrame, triedVehicles)
             return teleport(targetCFrame, triedVehicles)
         end
 
-        -- Move vehicle to target
+        -- Move vehicle to target - use vehicle speed
         MoveToPosition(vehicleObj.Engine, targetCFrame, Config.VehicleSpeed, true)
     else
-        -- Direct teleport
-        MoveToPosition(rootPart, targetCFrame, inVehicle and Config.VehicleSpeed or Config.PlayerSpeed, inVehicle)
+        -- Direct teleport - use appropriate speed based on vehicle status
+        local speed = inVehicle and Config.VehicleSpeed or Config.PlayerSpeed
+        MoveToPosition(rootPart, targetCFrame, speed, inVehicle)
     end
 
     task.wait(0.5)
