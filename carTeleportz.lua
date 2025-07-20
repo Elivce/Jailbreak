@@ -284,12 +284,19 @@ end);
 --// main teleport function (not returning a new function directly because of recursion)
 
 local function isInVehicle()
+    local Players = game:GetService("Players")
     local Player = Players.LocalPlayer
+
+    if not Player then
+        return false -- Or wait for Player to exist if needed
+    end
+
     local Character = Player.Character or Player.CharacterAdded:Wait()
     local inVehicle = Character:FindFirstChild("InVehicle")
-    
+
     return inVehicle and inVehicle.Value == true
 end
+
 
 local function teleport(cframe, tried) -- unoptimized
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
