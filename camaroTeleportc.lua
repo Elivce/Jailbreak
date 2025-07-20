@@ -245,8 +245,15 @@ end;
 
 --// raycast filter
 
-dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Blacklist;
-dependencies.variables.raycast_params.FilterDescendantsInstances = { player.Character, workspace.Vehicles, workspace:FindFirstChild("Rain") };
+dependencies.variables.raycast_params.FilterType = Enum.RaycastFilterType.Exclude;
+dependencies.variables.raycast_params.FilterDescendantsInstances = { player.Character, workspace.Vehicles };
+
+-- Add Rain to the filter if it exists
+local rain = workspace:FindFirstChild("Rain")
+if rain then
+    table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, rain)
+end
+
 
 workspace.ChildAdded:Connect(function(child) -- if it starts raining, add rain to collision ignore list
     if child.Name == "Rain" then 
@@ -254,9 +261,18 @@ workspace.ChildAdded:Connect(function(child) -- if it starts raining, add rain t
     end;
 end);
 
-player.CharacterAdded:Connect(function(character) -- when the player respawns, add character back to collision ignore list
-    table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, character);
-end);
+player.CharacterAdded:Connect(function(character)
+    -- Replace the character in the filter list
+    for i, instance in ipairs(dependencies.variables.raycast_params.FilterDescendantsInstances) do
+        if instance == player.Character then
+            dependencies.variables.raycast_params.FilterDescendantsInstances[i] = character
+            return
+        end
+    end
+    -- If not found, add it
+    table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, character)
+end)
+
 
 --// get free vehicles, owned helicopters, motorcycles and unsupported/new vehicles
 
