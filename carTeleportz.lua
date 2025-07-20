@@ -286,17 +286,13 @@ end);
 local function isInVehicle()
     local Players = game:GetService("Players")
     local Player = Players.LocalPlayer
-
-    if not Player then
-        return false -- Or wait for Player to exist if needed
-    end
-
     local Character = Player.Character or Player.CharacterAdded:Wait()
-    local inVehicle = Character:FindFirstChild("InVehicle")
-
-    return inVehicle and inVehicle.Value == true
+    if Character:FindFirstChild("InVehicle") then
+        return true
+    else
+        return false
+    end
 end
-
 
 local function teleport(cframe, tried) -- unoptimized
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
@@ -318,6 +314,7 @@ local function teleport(cframe, tried) -- unoptimized
         local Player = Players.LocalPlayer
         local Character = Player.Character or Player.CharacterAdded:Wait()
         local inVehicle = Character:FindFirstChild("InVehicle")
+        print(isInVehicle())
         if isInVehicle() then
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
         else 
