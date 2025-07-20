@@ -1,4 +1,5 @@
 getgenv().toggled = true -- Change this to false to stop kill aura.
+
 if getgenv().killauraloaded then return end
 
 local old = require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList
