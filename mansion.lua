@@ -755,6 +755,7 @@ local function getPistol()
 end
 
 local RobMansion = function()
+    local OriginalRaycast = Modules.Raycast.RayIgnoreNonCollideWithIgnoreList
     if InHeli() or InCar() then 
         ExitVehicle()
     end
@@ -907,6 +908,7 @@ local RobMansion = function()
     if not SmallTP(CFrame.new(3106, 51, -4412)) then return end
     if not SmallTP(CFrame.new(3106, 57, -4377)) then return end
     sendMessage("Successfully Assisted Mansion!")
+    Modules.Raycast.RayIgnoreNonCollideWithIgnoreList = OriginalRaycast
     teamMenu()
     task.wait(1)
     selectTeam("Prisoner")
