@@ -302,7 +302,8 @@ local function teleport(cframe, tried) -- unoptimized
         local Players = game:GetService("Players")
         local Player = Players.LocalPlayer
         local Character = Player.Character or Player.CharacterAdded:Wait()
-        if Character:FindFirstChild("InVehicle") then
+        local inVehicle = Character:FindFirstChild("InVehicle")
+        if inVehicle and inVehicle.Value == true then
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
