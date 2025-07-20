@@ -64,10 +64,6 @@ local dependencies = {
     unsupported_vehicles = { SWATVan = true },
     door_positions = { }    
 };
-raycast_params.RespectCanCollide = true
-raycast_params.IgnoreWater = true
-
-
 local movement = { };
 local utilities = { };
 
