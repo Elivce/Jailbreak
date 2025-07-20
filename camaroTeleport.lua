@@ -108,13 +108,29 @@ end;
 
 --// function to pathfind to a position with no collision above
 
+--// function to pathfind to a position with no collision above
 function movement:pathfind(tried)
+    print("[Pathfinding] Starting pathfind due to obstruction above player")
+    
+    -- First, identify what's above the player
+    local raycast_result = workspace:Raycast(
+        player.Character.HumanoidRootPart.Position, 
+        dependencies.variables.up_vector, 
+        dependencies.variables.raycast_params
+    )
+    
+    if raycast_result then
+        print("[Pathfinding] Obstruction detected:", raycast_result.Instance:GetFullName())
+    else
+        print("[Pathfinding] No obstruction found but pathfinding was triggered - this shouldn't happen")
+    end
+
     local distance = math.huge;
     local nearest;
 
     local tried = tried or { };
     
-    for index, value in next, dependencies.door_positions do -- find the nearest position in our list of positions without collision above
+    for index, value in next, dependencies.door_positions do
         if not table.find(tried, value) then
             local magnitude = (value.position - player.Character.HumanoidRootPart.Position).Magnitude;
             
@@ -125,6 +141,13 @@ function movement:pathfind(tried)
         end;
     end;
 
+    if not nearest then
+        print("[Pathfinding] No valid door positions found!")
+        return
+    end
+
+    print("[Pathfinding] Nearest open area at:", nearest.position, "near door:", nearest.instance:GetFullName())
+
     table.insert(tried, nearest);
 
     utilities:toggle_door_collision(nearest.instance, false);
@@ -132,7 +155,8 @@ function movement:pathfind(tried)
     local path = dependencies.variables.path;
     path:ComputeAsync(player.Character.HumanoidRootPart.Position, nearest.position);
 
-    if path.Status == Enum.PathStatus.Success then -- if path making is successful
+    if path.Status == Enum.PathStatus.Success then
+        print("[Pathfinding] Path computed successfully")
         local waypoints = path:GetWaypoints();
 
         for index = 1, #waypoints do 
@@ -140,35 +164,61 @@ function movement:pathfind(tried)
             
             player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0));
 
-            if not workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the player
+            -- Check again what's above us at each waypoint
+            local waypoint_raycast = workspace:Raycast(
+                player.Character.HumanoidRootPart.Position, 
+                dependencies.variables.up_vector, 
+                dependencies.variables.raycast_params
+            )
+            
+            if not waypoint_raycast then
+                print("[Pathfinding] Reached open area at waypoint", index)
                 utilities:toggle_door_collision(nearest.instance, true);
-
                 return;
+            else
+                print("[Pathfinding] Still obstructed at waypoint", index, "by:", waypoint_raycast.Instance:GetFullName())
             end;
 
             task.wait(0.05);
         end;
+    else
+        print("[Pathfinding] Path computation failed with status:", path.Status)
     end;
 
     utilities:toggle_door_collision(nearest.instance, true);
 
+    print("[Pathfinding] Retrying with different path...")
     movement:pathfind(tried);
 end;
 
 --// function to interpolate characters position to a position
-
 function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
     local vector_position = cframe.Position;
     
-    if not car and workspace:Raycast(part.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is an object above us, use pathfind function to get to a position with no collision above
-        movement:pathfind();
-        task.wait(0.5);
-    end;
+    if not car then
+        -- Enhanced obstruction check with debug info
+        local raycast_result = workspace:Raycast(
+            part.Position, 
+            dependencies.variables.up_vector, 
+            dependencies.variables.raycast_params
+        )
+        
+        if raycast_result then
+            print("[Movement] Obstruction detected above player:", raycast_result.Instance:GetFullName())
+            print("[Movement] Starting pathfinding to find open area...")
+            movement:pathfind();
+            task.wait(0.5);
+        else
+            print("[Movement] No obstruction detected - proceeding with direct movement")
+        end
+    end
     
     local y_level = 500;
-    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z); -- 300 studs above target position
+    local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z);
 
-    repeat -- use velocity to move towards the target position
+    print("[Movement] Moving to sky position:", higher_position)
+    
+    repeat
         local velocity_unit = (higher_position - part.Position).Unit * speed;
         part.Velocity = Vector3.new(velocity_unit.X, 0, velocity_unit.Z);
 
@@ -176,22 +226,21 @@ function movement:move_to_position(part, cframe, speed, car, target_vehicle, tri
 
         part.CFrame = CFrame.new(part.CFrame.X, y_level, part.CFrame.Z);
 
-        if target_vehicle and target_vehicle.Seat.Player.Value then -- if someone occupies the vehicle while we're moving to it, we need to move to the next vehicle
+        if target_vehicle and target_vehicle.Seat.Player.Value then
             table.insert(tried_vehicles, target_vehicle);
-
             local nearest_vehicle = utilities:get_nearest_vehicle(tried_vehicles);
             local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot;
 
             if vehicle_object then 
                 movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, 135, false, vehicle_object);
             end;
-
             return;
         end;
     until (part.Position - higher_position).Magnitude < 10;
 
     part.CFrame = CFrame.new(part.Position.X, vector_position.Y, part.Position.Z);
     part.Velocity = Vector3.zero;
+    print("[Movement] Reached target position")
 end;
 
 --// raycast filter
