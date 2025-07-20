@@ -39,7 +39,7 @@ local dependencies = {
 local movement = { }
 local utilities = { }
 
---// Improved raycast function from Code 1
+--// Improved raycast function
 function utilities:rayCast(pos, dir)
     local ignoreList = {}
     if player.Character then table.insert(ignoreList, player.Character) end
@@ -89,6 +89,23 @@ function utilities:get_nearest_vehicle(tried)
     end
 
     return nearest
+end
+
+function utilities:is_in_vehicle()
+    if not player.Character then return false end
+    return player.Character:FindFirstChild("InVehicle") ~= nil
+end
+
+function utilities:get_current_vehicle()
+    if not utilities:is_in_vehicle() then return nil end
+    
+    for _, vehicle in ipairs(workspace.Vehicles:GetChildren()) do
+        if vehicle:FindFirstChild("Seat") and vehicle.Seat.PlayerName.Value == player.Name then
+            return vehicle
+        end
+    end
+    
+    return nil
 end
 
 function movement:pathfind(tried)
@@ -173,6 +190,7 @@ function movement:move_to_position(part, cframe, speed, car, target_vehicle, tri
     part.Velocity = Vector3.zero
 end
 
+-- Initialize vehicle data
 for _, vehicle_data in next, dependencies.modules.vehicle_data do
     if vehicle_data.Type == "Heli" then
         dependencies.helicopters[vehicle_data.Make] = true
@@ -189,6 +207,7 @@ for _, vehicle_data in next, dependencies.modules.vehicle_data do
     end
 end
 
+-- Initialize door positions
 for _, value in next, workspace:GetDescendants() do
     if value.Name:sub(-4, -1) == "Door" then 
         local touch_part = value:FindFirstChild("Touch")
@@ -214,6 +233,7 @@ for _, value in next, workspace:GetDescendants() do
     end
 end
 
+-- Hook functions to prevent fall damage while teleporting
 local old_is_point_in_tag = dependencies.modules.player_utils.isPointInTag
 dependencies.modules.player_utils.isPointInTag = function(point, tag)
     if dependencies.variables.teleporting and (tag == "NoRagdoll" or tag == "NoFallDamage") then
@@ -232,6 +252,7 @@ dependencies.modules.paraglide.IsFlying = function(...)
     return oldIsFlying(...)
 end
 
+-- Velocity stopper
 task.spawn(function()
     while task.wait() do
         if dependencies.variables.stopVelocity and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -241,6 +262,10 @@ task.spawn(function()
 end)
 
 local function teleport(cframe, tried)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position)
     local target_distance = relative_position.Magnitude
 
@@ -250,39 +275,48 @@ local function teleport(cframe, tried)
         return
     end 
 
-    local tried = tried or { }
-    local nearest_vehicle = utilities:get_nearest_vehicle(tried)
-    local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot
-
+    local tried = tried or {}
+    local current_vehicle = utilities:get_current_vehicle()
+    
     dependencies.variables.teleporting = true
 
-    if vehicle_object then 
-        local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude
-        
-        if vehicle_object.Seat.PlayerName.Value ~= player.Name then
-            movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried)
-
-            dependencies.variables.stopVelocity = true
-
-            local enter_attempts = 1
-
-            repeat
-                nearest_vehicle:Callback(true)
-                enter_attempts = enter_attempts + 1
-                task.wait(0.1)
-            until enter_attempts == 10 or vehicle_object.Seat.PlayerName.Value == player.Name
-
-            dependencies.variables.stopVelocity = false
-
-            if vehicle_object.Seat.PlayerName.Value ~= player.Name then
-                table.insert(tried, vehicle_object)
-                return teleport(cframe, tried or { vehicle_object })
-            end
-        end
-
-        movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true)
+    if current_vehicle then
+        -- Player is already in a vehicle, use it for teleportation
+        movement:move_to_position(current_vehicle.Engine, cframe, dependencies.variables.vehicle_speed, true)
     else
-        movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed)
+        -- Player is not in a vehicle, try to find one
+        local nearest_vehicle = utilities:get_nearest_vehicle(tried)
+        local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot
+
+        if vehicle_object then 
+            local vehicle_distance = (vehicle_object.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude
+            
+            if vehicle_object.Seat.PlayerName.Value ~= player.Name then
+                movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried)
+
+                dependencies.variables.stopVelocity = true
+
+                local enter_attempts = 1
+
+                repeat
+                    nearest_vehicle:Callback(true)
+                    enter_attempts = enter_attempts + 1
+                    task.wait(0.1)
+                until enter_attempts == 10 or vehicle_object.Seat.PlayerName.Value == player.Name
+
+                dependencies.variables.stopVelocity = false
+
+                if vehicle_object.Seat.PlayerName.Value ~= player.Name then
+                    table.insert(tried, vehicle_object)
+                    return teleport(cframe, tried)
+                end
+            end
+
+            movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true)
+        else
+            -- No vehicle found, just teleport normally
+            movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed)
+        end
     end
 
     task.wait(0.5)
