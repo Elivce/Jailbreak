@@ -42,11 +42,11 @@ local player = players.LocalPlayer;
 
 local dependencies = {
     variables = {
-        up_vector = Vector3.new(0, 300, 0),
+        up_vector = Vector3.new(0, 500, 0),
         raycast_params = RaycastParams.new(),
         path = pathfinding_service:CreatePath({WaypointSpacing = 3}),
         player_speed = 150, 
-        vehicle_speed = 450,
+        vehicle_speed = 400,
         teleporting = false,
         stopVelocity = false
     },
@@ -165,7 +165,7 @@ function movement:move_to_position(part, cframe, speed, car, target_vehicle, tri
         task.wait(0.5);
     end;
     
-    local y_level = 300;
+    local y_level = 500;
     local higher_position = Vector3.new(vector_position.X, y_level, vector_position.Z); -- 300 studs above target position
 
     repeat -- use velocity to move towards the target position
