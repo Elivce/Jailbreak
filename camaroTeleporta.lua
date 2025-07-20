@@ -64,8 +64,7 @@ local dependencies = {
     unsupported_vehicles = { SWATVan = true },
     door_positions = { }    
 };
-raycast_params.IgnoreWater = true
-raycast_params.RespectCanCollide = true
+
 local movement = { };
 local utilities = { };
 
@@ -139,7 +138,7 @@ function movement:pathfind(tried)
         for index = 1, #waypoints do 
             local waypoint = waypoints[index];
             
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0)); -- walking movement is less optimal
+            player.Character:FindFirstChild("Head") and player.Character.Head.Position or player.Character.HumanoidRootPart.Position + Vector3.new(0, 2.5, 0); -- walking movement is less optimal
 
             if not workspace:Raycast(player.Character.HumanoidRootPart.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then -- if there is nothing above the player
                 utilities:toggle_door_collision(nearest.instance, true);
