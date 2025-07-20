@@ -317,6 +317,7 @@ local function teleport(cframe, tried) -- unoptimized
         if isInVehicle() then
             print('yes')
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
+            print("Moving vehicle to:", cframe, "with speed:", dependencies.variables.vehicle_speed)
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
                 movement:move_to_position(player.Character.HumanoidRootPart, vehicle_object.Seat.CFrame, dependencies.variables.player_speed, false, vehicle_object, tried);
