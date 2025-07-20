@@ -1,5 +1,4 @@
 getgenv().toggled = true -- Change this to false to stop kill aura.
-
 if getgenv().killauraloaded then return end
 
 local old = require(game:GetService("ReplicatedStorage").Module.RayCast).RayIgnoreNonCollideWithIgnoreList
@@ -52,11 +51,19 @@ local function getNearestEnemy()
 end
 
 local function shoot()
-    local currentGun = require(game:GetService("ReplicatedStorage").Game:WaitForChild("ItemSystem"):WaitForChild("ItemSystem")).GetLocalEquipped()
+    local success, err = pcall(function()
+        local currentGun = require(game:GetService("ReplicatedStorage").Game:WaitForChild("ItemSystem"):WaitForChild("ItemSystem")).GetLocalEquipped()
+        
+        if not currentGun then return end
+        
+        require(game:GetService("ReplicatedStorage").Game:WaitForChild("Item"):WaitForChild("Gun"))._attemptShoot(currentGun)
+    end)
     
-    if not currentGun then return end
-    
-    require(game:GetService("ReplicatedStorage").Game:WaitForChild("Item"):WaitForChild("Gun"))._attemptShoot(currentGun)
+    if not success then
+        getgenv().toggled = false
+        return false
+    end
+    return true
 end
 
 getgenv().killauraloaded = true
@@ -114,7 +121,7 @@ while wait(0.5) do
                   
                 game:GetService("Players").LocalPlayer.Folder.Pistol.InventoryEquipRemote:FireServer(true)
                 wait()
-                shoot()
+                if not shoot() then break end -- Stop if shoot fails
             end
         end
         
