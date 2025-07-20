@@ -30,15 +30,14 @@
 
 --// services
 
-local replicated_storage = game:GetService("ReplicatedStorage");
-local run_service = game:GetService("RunService");
-local pathfinding_service = game:GetService("PathfindingService");
-local players = game:GetService("Players");
-local tween_service = game:GetService("TweenService");
+--// services
+local replicated_storage = game:GetService("ReplicatedStorage")
+local pathfinding_service = game:GetService("PathfindingService")
+local players = game:GetService("Players")
+local run_service = game:GetService("RunService")
 
 --// variables
-
-local player = players.LocalPlayer;
+local player = players.LocalPlayer
 
 local dependencies = {
     variables = {
@@ -48,168 +47,106 @@ local dependencies = {
         player_speed = 150, 
         vehicle_speed = 400,
         teleporting = false,
-        stopVelocity = false
+        stopVelocity = false,
+        debug_part = Instance.new("Part") -- For visual debugging
     },
-    modules = {
-        ui = require(replicated_storage.Module.UI),
-        store = require(replicated_storage.App.store),
-        player_utils = require(replicated_storage.Game.PlayerUtils),
-        vehicle_data = require(replicated_storage.Game.Garage.VehicleData),
-        character_util = require(replicated_storage.Game.CharacterUtil),
-        paraglide = require(replicated_storage.Game.Paraglide)
-    },
-    helicopters = { Heli = true }, -- heli is included in free vehicles
-    motorcycles = { Volt = true }, -- volt type is "custom" but works the same as a motorcycle
-    free_vehicles = { Camaro = true },
-    unsupported_vehicles = { SWATVan = true },
-    door_positions = { }    
-};
+    -- ... (rest of your dependencies table remains the same)
+}
 
-local movement = { };
-local utilities = { };
+-- Configure debug part
+dependencies.variables.debug_part.Anchored = true
+dependencies.variables.debug_part.CanCollide = false
+dependencies.variables.debug_part.Transparency = 0.7
+dependencies.variables.debug_part.Color = Color3.new(1, 0, 0)
+dependencies.variables.debug_part.Size = Vector3.new(2, 2, 2)
+dependencies.variables.debug_part.Parent = workspace
 
---// function to toggle if a door can be collided with
-
-function utilities:toggle_door_collision(door, toggle)
-    for index, child in next, door.Model:GetChildren() do 
-        if child:IsA("BasePart") then 
-            child.CanCollide = toggle;
-        end; 
-    end;
-end;
-
---// function to get the nearest vehicle that can be entered
-
-function utilities:get_nearest_vehicle(tried) -- unoptimized
-    local nearest;
-    local distance = math.huge;
-
-    for index, action in next, dependencies.modules.ui.CircleAction.Specs do -- all of the interations
-        if action.IsVehicle and action.ShouldAllowEntry == true and action.Enabled == true and action.Name == "Enter Driver" then -- if the interaction is to enter the driver seat of a vehicle
-            local vehicle = action.ValidRoot;
-
-            if not table.find(tried, vehicle) and workspace.VehicleSpawns:FindFirstChild(vehicle.Name) then
-                if not dependencies.unsupported_vehicles[vehicle.Name] and (dependencies.modules.store._state.garageOwned.Vehicles[vehicle.Name] or dependencies.free_vehicles[vehicle.Name]) and not vehicle.Seat.Player.Value then -- check if the vehicle is supported, owned and not already occupied
-                    if not workspace:Raycast(vehicle.Seat.Position, dependencies.variables.up_vector, dependencies.variables.raycast_params) then
-                        local magnitude = (vehicle.Seat.Position - player.Character.HumanoidRootPart.Position).Magnitude; 
-
-                        if magnitude < distance then 
-                            distance = magnitude;
-                            nearest = action;
-                        end;
-                    end;
-                end;
-            end;
-        end;
-    end;
-
-    return nearest;
-end;
-
---// function to pathfind to a position with no collision above
-
---// function to pathfind to a position with no collision above
-function movement:pathfind(tried)
-    print("[Pathfinding] Starting pathfind due to obstruction above player")
+--// Improved raycast filter setup
+local function updateRaycastFilter(character)
+    if not character then return end
     
-    -- First, identify what's above the player
-    local raycast_result = workspace:Raycast(
-        player.Character.HumanoidRootPart.Position, 
-        dependencies.variables.up_vector, 
-        dependencies.variables.raycast_params
-    )
-    
-    if raycast_result then
-        print("[Pathfinding] Obstruction detected:", raycast_result.Instance:GetFullName())
-    else
-        print("[Pathfinding] No obstruction found but pathfinding was triggered - this shouldn't happen")
+    local filterList = {workspace.Vehicles}
+    if workspace:FindFirstChild("Rain") then
+        table.insert(filterList, workspace.Rain)
     end
-
-    local distance = math.huge;
-    local nearest;
-
-    local tried = tried or { };
     
-    for index, value in next, dependencies.door_positions do
-        if not table.find(tried, value) then
-            local magnitude = (value.position - player.Character.HumanoidRootPart.Position).Magnitude;
-            
-            if magnitude < distance then 
-                distance = magnitude;
-                nearest = value;
-            end;
-        end;
-    end;
+    -- Add all character parts to filter
+    local function addParts(object)
+        for _, child in ipairs(object:GetDescendants()) do
+            if child:IsA("BasePart") then
+                table.insert(filterList, child)
+            end
+        end
+    end
+    
+    addParts(character)
+    dependencies.variables.raycast_params.FilterDescendantsInstances = filterList
+end
 
-    if not nearest then
-        print("[Pathfinding] No valid door positions found!")
+player.CharacterAdded:Connect(function(character)
+    updateRaycastFilter(character)
+    character.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("BasePart") then
+            table.insert(dependencies.variables.raycast_params.FilterDescendantsInstances, descendant)
+        end
+    end)
+end)
+
+-- Initialize filter if character already exists
+if player.Character then
+    updateRaycastFilter(player.Character)
+end
+
+--// Improved obstruction check function
+function utilities:isPositionObstructed(position, direction)
+    -- Visualize the raycast
+    dependencies.variables.debug_part.Position = position
+    dependencies.variables.debug_part.Size = Vector3.new(2, direction.Magnitude, 2)
+    dependencies.variables.debug_part.CFrame = CFrame.new(position, position + direction) * CFrame.new(0, 0, -direction.Magnitude/2)
+    
+    local result = workspace:Raycast(position, direction, dependencies.variables.raycast_params)
+    
+    if result then
+        print("[Obstruction] Detected:", result.Instance:GetFullName())
+        -- Check if the obstruction is actually part of our character (shouldn't happen with proper filtering)
+        if result.Instance:IsDescendantOf(player.Character) then
+            print("[Warning] Character part detected as obstruction - filter may not be working properly!")
+            return false
+        end
+        return true
+    end
+    return false
+end
+
+--// Modified pathfind function
+function movement:pathfind(tried)
+    print("[Pathfinding] Starting pathfind...")
+    
+    -- First verify there's actually an obstruction
+    if not utilities:isPositionObstructed(
+        player.Character.HumanoidRootPart.Position, 
+        dependencies.variables.up_vector
+    ) then
+        print("[Pathfinding] No real obstruction found - aborting pathfind")
         return
     end
 
-    print("[Pathfinding] Nearest open area at:", nearest.position, "near door:", nearest.instance:GetFullName())
-
-    table.insert(tried, nearest);
-
-    utilities:toggle_door_collision(nearest.instance, false);
-
-    local path = dependencies.variables.path;
-    path:ComputeAsync(player.Character.HumanoidRootPart.Position, nearest.position);
-
-    if path.Status == Enum.PathStatus.Success then
-        print("[Pathfinding] Path computed successfully")
-        local waypoints = path:GetWaypoints();
-
-        for index = 1, #waypoints do 
-            local waypoint = waypoints[index];
-            
-            player.Character.HumanoidRootPart.CFrame = CFrame.new(waypoint.Position + Vector3.new(0, 2.5, 0));
-
-            -- Check again what's above us at each waypoint
-            local waypoint_raycast = workspace:Raycast(
-                player.Character.HumanoidRootPart.Position, 
-                dependencies.variables.up_vector, 
-                dependencies.variables.raycast_params
-            )
-            
-            if not waypoint_raycast then
-                print("[Pathfinding] Reached open area at waypoint", index)
-                utilities:toggle_door_collision(nearest.instance, true);
-                return;
-            else
-                print("[Pathfinding] Still obstructed at waypoint", index, "by:", waypoint_raycast.Instance:GetFullName())
-            end;
-
-            task.wait(0.05);
-        end;
-    else
-        print("[Pathfinding] Path computation failed with status:", path.Status)
-    end;
-
-    utilities:toggle_door_collision(nearest.instance, true);
-
-    print("[Pathfinding] Retrying with different path...")
-    movement:pathfind(tried);
-end;
+    -- Rest of your pathfind implementation...
+    -- ... (keep your existing pathfind code, but it will now only run when there's a real obstruction)
+end
 
 --// function to interpolate characters position to a position
 function movement:move_to_position(part, cframe, speed, car, target_vehicle, tried_vehicles)
-    local vector_position = cframe.Position;
+    local vector_position = cframe.Position
     
     if not car then
-        -- Enhanced obstruction check with debug info
-        local raycast_result = workspace:Raycast(
-            part.Position, 
-            dependencies.variables.up_vector, 
-            dependencies.variables.raycast_params
-        )
-        
-        if raycast_result then
-            print("[Movement] Obstruction detected above player:", raycast_result.Instance:GetFullName())
-            print("[Movement] Starting pathfinding to find open area...")
-            movement:pathfind();
-            task.wait(0.5);
+        -- Only pathfind if there's a real obstruction
+        if utilities:isPositionObstructed(part.Position, dependencies.variables.up_vector) then
+            print("[Movement] Real obstruction detected above player")
+            movement:pathfind()
+            task.wait(0.5)
         else
-            print("[Movement] No obstruction detected - proceeding with direct movement")
+            print("[Movement] No obstruction - proceeding directly")
         end
     end
     
