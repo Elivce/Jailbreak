@@ -283,6 +283,14 @@ end);
 
 --// main teleport function (not returning a new function directly because of recursion)
 
+local function isInVehicle()
+    local Player = Players.LocalPlayer
+    local Character = Player.Character or Player.CharacterAdded:Wait()
+    local inVehicle = Character:FindFirstChild("InVehicle")
+    
+    return inVehicle and inVehicle.Value == true
+end
+
 local function teleport(cframe, tried) -- unoptimized
     local relative_position = (cframe.Position - player.Character.HumanoidRootPart.Position);
     local target_distance = relative_position.Magnitude;
@@ -303,7 +311,7 @@ local function teleport(cframe, tried) -- unoptimized
         local Player = Players.LocalPlayer
         local Character = Player.Character or Player.CharacterAdded:Wait()
         local inVehicle = Character:FindFirstChild("InVehicle")
-        if inVehicle and inVehicle.Value == true then
+        if isInVehicle() then
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true);
         else 
             if vehicle_object.Seat.PlayerName.Value ~= player.Name then
