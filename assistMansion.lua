@@ -814,7 +814,7 @@ local RobMansion = function()
     sendMessage("AutoBot is waiting for cutscene to end")
     Modules.MansionUtils.getProgressionStateChangedSignal(MansionRobbery):Wait()
     sendMessage("AutoBot is Killing the CEO")
-	SmallTP(CFrame.new(3119, -205, -4439))
+    SmallTP(CFrame.new(3119, -205, -4439))
     local BV = Instance.new("BodyVelocity", root)
     BV.P = 3000
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
