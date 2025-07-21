@@ -758,7 +758,7 @@ local RobMansion = function()
     if InHeli() or InCar() then 
         ExitVehicle()
     end
-    sendMessage("Entering Mansion")
+    sendMessage("AutoBot is Entering Mansion")
     local MansionRobbery = workspace.MansionRobbery
     local TouchToEnter = MansionRobbery.Lobby.EntranceElevator.TouchToEnter
     local ElevatorDoor = MansionRobbery.ArrivalElevator.Floors:GetChildren()[1].DoorLeft.InnerModel.Door
@@ -797,7 +797,7 @@ local RobMansion = function()
     for _, instance in pairs(MansionRobbery.LaserTraps:GetChildren()) do
         instance:Remove()
     end  
-    sendMessage("Skipping Mansion Obby")
+    sendMessage("AutoBot is Skipping Mansion Obby")
     local tper2 = RunService.Heartbeat:Connect(function()
         root.CFrame = MansionActivateDoor		
     end)
@@ -811,9 +811,10 @@ local RobMansion = function()
         humanoid.Health = 0
         return
     end
-    sendMessage("Waiting for Cutscene to end")
+    sendMessage("AutoBot is waiting for cutscene to end")
     Modules.MansionUtils.getProgressionStateChangedSignal(MansionRobbery):Wait()
-    sendMessage("Killing the CEO")
+    sendMessage("AutoBot is Killing the CEO")
+	SmallTP(CFrame.new(3119, -205, -4439))
     local BV = Instance.new("BodyVelocity", root)
     BV.P = 3000
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
@@ -891,9 +892,8 @@ local RobMansion = function()
     require(Modules.EquipThing).AttemptSetEquipped({obj = game:GetService("Players").LocalPlayer.Folder["Pistol"]}, false)
 
     player.Folder.Pistol.InventoryEquipRemote:FireServer(false)
-    repeat task.wait() until playerGui.AppUI:FindFirstChild("RewardSpinner")
-
-    sendMessage("Exiting Mansion")
+	wait(10)
+    sendMessage("AutoBot is Exiting Mansion")
 
     if not SmallTP(CFrame.new(3122, -205, -4527)) then return end
     if not SmallTP(CFrame.new(3119, -205, -4439)) then return end
@@ -906,7 +906,7 @@ local RobMansion = function()
     if not SmallTP(CFrame.new(3124, 51, -4415)) then return end
     if not SmallTP(CFrame.new(3106, 51, -4412)) then return end
     if not SmallTP(CFrame.new(3106, 57, -4377)) then return end
-    sendMessage("Successfully Assisted Mansion!")
+    sendMessage("AutoBot has successfully assisted Mansion!")
     Modules.Raycast.RayIgnoreNonCollideWithIgnoreList = OriginalRaycast
     teamMenu()
     task.wait(1)
