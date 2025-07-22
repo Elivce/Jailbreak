@@ -31,7 +31,7 @@ local dependencies = {
     },
     helicopters = { Heli = true },
     motorcycles = { Volt = true },
-    free_vehicles = { Camaro = true },
+    free_vehicles = { Camaro = true, Model3 = true }
     unsupported_vehicles = { SWATVan = true },
     door_positions = { }    
 }
@@ -193,7 +193,7 @@ end
 -- Initialize vehicle data
 for _, vehicle_data in next, dependencies.modules.vehicle_data do
     if vehicle_data.Type == "Heli" then
-        dependencies.helicopters[vehicle_data.Make] = true
+        dependencies.[vehicle_data.Make] = true
     elseif vehicle_data.Type == "Motorcycle" then
         dependencies.motorcycles[vehicle_data.Make] = true
     end
