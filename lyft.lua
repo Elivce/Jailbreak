@@ -32,7 +32,7 @@ local dependencies = {
     helicopters = { Heli = true },
     motorcycles = { Volt = true },
     free_vehicles = { Camaro = true, Model3 = true },
-    unsupported_vehicles = { SWATVan = true },
+    unsupported_vehicles = { SWATVan = true, Dirtbike = true },
     door_positions = { }    
 }
 
