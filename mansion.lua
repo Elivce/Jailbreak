@@ -61,33 +61,6 @@ if getgenv().WebhookUrl == nil then
 	getgenv().WebhookUrl = ""
 end
 
--- [[ Check If Executed ]]
-
-if getgenv().Dropfarm == true then print("// Already executed [Dropfarm]") return end
-
--- [[ Set Executed ]]
-
-getgenv().Dropfarm = false
-
--- [[ Directory ]]
-
-local Directory = "x2zu"
-if not isfolder(Directory) then
-	makefolder(Directory)
-end
-
--- [[ Queuening + UI ]]
-
-local MoneyMade, RunTime = 0, 0
-local queue = ""
-local queued = false
-local ui_options = {
-	main_color = Color3.fromRGB(41, 74, 122),
-	min_size = Vector2.new(400, 300),
-	toggle_key = Enum.KeyCode.RightShift,
-	can_resize = true,
-}
-
 -- [[ Formating functions ]]
 
 function TickToHM(seconds)
@@ -99,29 +72,6 @@ function TickToHM(seconds)
 	return hours .. "h/" .. minutes .. "m"
 end
 
-function FormatCash(number)
-	local totalnum = tostring(number):split("")
-
-	if #totalnum == 7 then
-		return totalnum[1].."."..totalnum[2].."M"
-	elseif #totalnum >= 10 then
-		return totalnum[1].."."..totalnum[2].."B"
-	elseif #totalnum == 4 and #totalnum[2] == 0 then
-		return totalnum[1].."k"
-	elseif #totalnum == 4  then
-		return totalnum[1].."."..totalnum[2].."k"
-	elseif #totalnum == 5  then
-		return totalnum[1]..totalnum[2].."."..totalnum[3].."k"
-	elseif #totalnum == 6  then
-		return totalnum[1]..totalnum[2]..totalnum[3].."k"
-	else
-		return number
-	end
-end
-
--- [[ Webhook ]]
-
-local SentWebhookServerhop = false
 
 -- [[ Important modules ]]
 
@@ -258,13 +208,6 @@ end)()
 
 -- [[ Robbery States ]]
 
-local function WaitForReward()
-	if player.PlayerGui.AppUI:FindFirstChild("RewardSpinner") then
-		repeat 
-			task.wait() 
-		until not player.PlayerGui.AppUI:FindFirstChild("RewardSpinner")
-	end
-end
 
 local robberyState = ReplicatedStorage.RobberyState
 local robberyConsts = Modules.RobberyConsts
@@ -368,27 +311,6 @@ local function ShootGun()
 	local currentGun = require(game:GetService("ReplicatedStorage").Game:WaitForChild("ItemSystem"):WaitForChild("ItemSystem")).GetLocalEquipped()
 	if not currentGun then return end
 	require(game:GetService("ReplicatedStorage").Game:WaitForChild("Item"):WaitForChild("Gun"))._attemptShoot(currentGun)
-end
-
-local function GetGun()
-	local SetThreadId = (setidentity or set_thread_identity or (syn and syn.set_thread_identity) or setthreadcontext or set_thread_context)
-	local IsOpen = pcall(Modules.GunShopUI.open)
-
-	SetThreadId(2)
-	Modules.GunShopUI.displayList(Modules.GunShopUtils.getCategoryData("Held"))
-	SetThreadId(7)
-
-	repeat 
-		for i, v in next, Modules.GunShopUI.gui.Container.Container.Main.Container.Slider:GetChildren() do
-			if v:IsA("ImageLabel") and v.Name == "Pistol" and (v.Bottom.Action.Text == "FREE" or v.Bottom.Action.Text == "EQUIP") then
-				firesignal(v.Bottom.Action.MouseButton1Down)
-			end
-		end    
-
-		task.wait()
-	until player.Folder:FindFirstChild("Pistol")
-
-	pcall(Modules.GunShopUI.close)
 end
 
 -- [[ Teleporting requirements ]]
@@ -753,6 +675,15 @@ local function getPistol()
     game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
 end
 
+local function dropItem()
+    local serverHash = getServerHash()
+    local dropHash = getEventValue("g4rjtgue")
+    local args = {
+        [1] = dropHash
+    }
+    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+end
+
 local RobMansion = function()
     local OriginalRaycast = Modules.Raycast.RayIgnoreNonCollideWithIgnoreList
     if InHeli() or InCar() then 
@@ -814,7 +745,8 @@ local RobMansion = function()
     sendMessage("AutoBot is waiting for cutscene to end")
     Modules.MansionUtils.getProgressionStateChangedSignal(MansionRobbery):Wait()
     sendMessage("AutoBot is Killing the CEO")
-    SmallTP(CFrame.new(3119, -205, -4439))
+    SmallTP(CFrame.new(3139.5, -204.9, -4441.4))
+	task.wait(0.5)
     local BV = Instance.new("BodyVelocity", root)
     BV.P = 3000
     BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
