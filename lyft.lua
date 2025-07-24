@@ -261,6 +261,14 @@ task.spawn(function()
     end
 end)
 
+local function spawnCar()
+    local args = {
+        [1] = "Chassis",
+        [2] = "Model3"
+    }
+    game:GetService("ReplicatedStorage").GarageSpawnVehicle:FireServer(unpack(args))
+end
+
 local function teleport(cframe, tried)
     if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
         return
@@ -281,10 +289,8 @@ local function teleport(cframe, tried)
     dependencies.variables.teleporting = true
 
     if current_vehicle then
-        -- Player is already in a vehicle, use it for teleportation
         movement:move_to_position(current_vehicle.Engine, cframe, dependencies.variables.vehicle_speed, true)
     else
-        -- Player is not in a vehicle, try to find one
         local nearest_vehicle = utilities:get_nearest_vehicle(tried)
         local vehicle_object = nearest_vehicle and nearest_vehicle.ValidRoot
 
@@ -314,8 +320,9 @@ local function teleport(cframe, tried)
 
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true)
         else
-            -- No vehicle found, just teleport normally
-            movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed)
+            spawnCar()
+            task.wait(1.5)
+            return teleport(cframe, tried)
         end
     end
 
