@@ -684,6 +684,18 @@ local function dropItem()
     game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
 end
 
+local OriginalFunctions = {
+    RayIgnoreNonCollide = Modules.Raycast.RayIgnoreNonCollideWithIgnoreList,
+    NpcNew = Modules.Npc.new,
+    NpcGetTarget = Modules.Npc.GetTarget,
+    NpcGoTo = Modules.NpcShared.goTo,
+    BulletEmitterEmit = Modules.BulletEmitter.Emit,
+    ItemReloadDropAmmoVisual = require(ReplicatedStorage.Game.Item.Gun).ReloadDropAmmoVisual,
+    ItemReloadDropAmmoSound = require(ReplicatedStorage.Game.Item.Gun).ReloadDropAmmoSound,
+    ItemReloadRefillAmmoSound = require(ReplicatedStorage.Game.Item.Gun).ReloadRefillAmmoSound,
+    ItemShootSound = require(ReplicatedStorage.Game.Item.Gun).ShootSound,
+}
+
 local RobMansion = function()
     local OriginalRaycast = Modules.Raycast.RayIgnoreNonCollideWithIgnoreList
     if InHeli() or InCar() then 
@@ -839,11 +851,21 @@ local RobMansion = function()
     if not SmallTP(CFrame.new(3106, 51, -4412)) then return end
     if not SmallTP(CFrame.new(3106, 57, -4377)) then return end
     sendMessage("AutoBot has successfully assisted Mansion!")
-    Modules.Raycast.RayIgnoreNonCollideWithIgnoreList = OriginalRaycast
+    Modules.Raycast.RayIgnoreNonCollideWithIgnoreList = OriginalFunctions.RayIgnoreNonCollide
+    Modules.Npc.new = OriginalFunctions.NpcNew
+    Modules.Npc.GetTarget = OriginalFunctions.NpcGetTarget
+    Modules.NpcShared.goTo = OriginalFunctions.NpcGoTo
+    getfenv(Modules.BulletEmitter.Emit).Instance = {}
+    for _, item in pairs(ReplicatedStorage.Game.Item:GetChildren()) do
+        require(item).ReloadDropAmmoVisual = OriginalFunctions.ItemReloadDropAmmoVisual
+        require(item).ReloadDropAmmoSound = OriginalFunctions.ItemReloadDropAmmoSound
+        require(item).ReloadRefillAmmoSound = OriginalFunctions.ItemReloadRefillAmmoSound
+        require(item).ShootSound = OriginalFunctions.ItemShootSound
+    end
     teamMenu()
     task.wait(1)
     selectTeam("Prisoner")
-    task.wait(.1)
+    task.wait(0.1)
 end
 
 RobMansion()
