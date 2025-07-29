@@ -620,7 +620,7 @@ local function SmallTP(cframe, speed)
 end
 
 local function sendMessage(msg)
-    game:GetService("TextChatService").TextChannels:FindFirstChild("RBXGeneral"):SendAsync(msg)
+    game:GetService("TextChatService").TextChannels:FindFirstChild("RBXTeamBright red"):SendAsync(msg)
 end
 
 local function getServerHash()
