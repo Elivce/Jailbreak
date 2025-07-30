@@ -320,9 +320,7 @@ local function teleport(cframe, tried)
 
             movement:move_to_position(vehicle_object.Engine, cframe, dependencies.variables.vehicle_speed, true)
         else
-            spawnCar()
-            task.wait(1.5)
-            return teleport(cframe, tried)
+            movement:move_to_position(player.Character.HumanoidRootPart, cframe, dependencies.variables.player_speed);
         end
     end
 
