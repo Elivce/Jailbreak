@@ -866,6 +866,7 @@ local RobMansion = function()
     task.wait(1)
     selectTeam("Prisoner")
     task.wait(0.1)
+    return
 end
 
 RobMansion()
