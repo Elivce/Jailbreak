@@ -696,6 +696,61 @@ local OriginalFunctions = {
     ItemShootSound = require(ReplicatedStorage.Game.Item.Gun).ShootSound,
 }
 
+local function CleanUpAfterRobbery()
+    -- Reset all modified functions to their original state
+    Modules.Raycast.RayIgnoreNonCollideWithIgnoreList = OriginalFunctions.RayIgnoreNonCollide
+    Modules.Npc.new = OriginalFunctions.NpcNew
+    Modules.Npc.GetTarget = OriginalFunctions.NpcGetTarget
+    Modules.NpcShared.goTo = OriginalFunctions.NpcGoTo
+    Modules.BulletEmitter.Emit = OriginalFunctions.BulletEmitterEmit
+    
+    -- Reset gun-related functions
+    for _, item in pairs(ReplicatedStorage.Game.Item:GetChildren()) do
+        if require(item).ReloadDropAmmoVisual then
+            require(item).ReloadDropAmmoVisual = OriginalFunctions.ItemReloadDropAmmoVisual
+        end
+        if require(item).ReloadDropAmmoSound then
+            require(item).ReloadDropAmmoSound = OriginalFunctions.ItemReloadDropAmmoSound
+        end
+        if require(item).ReloadRefillAmmoSound then
+            require(item).ReloadRefillAmmoSound = OriginalFunctions.ItemReloadRefillAmmoSound
+        end
+        if require(item).ShootSound then
+            require(item).ShootSound = OriginalFunctions.ItemShootSound
+        end
+    end
+    
+    -- Reset bullet emitter environment
+    getfenv(Modules.BulletEmitter.Emit).Instance = {}
+    
+    -- Clear any active connections
+    if tper1 then tper1:Disconnect() end
+    if tper2 then tper2:Disconnect() end
+    if BV then BV:Destroy() end
+    
+    -- Reset character state
+    if humanoid then
+        humanoid:SetStateEnabled("Running", true)
+        humanoid:SetStateEnabled("Climbing", true)
+    end
+    
+    -- Drop any held items
+    dropItem()
+    
+    -- Reset team
+    teamMenu()
+    task.wait(1)
+    selectTeam("Prisoner")
+    
+    -- Clear variables
+    FailMansion = nil
+    FailedStart = nil
+    MansionRobbery = nil
+    BossCEO = nil
+    OldHealth = nil
+end
+
+
 local RobMansion = function()
     local OriginalRaycast = Modules.Raycast.RayIgnoreNonCollideWithIgnoreList
     if InHeli() or InCar() then 
@@ -866,7 +921,7 @@ local RobMansion = function()
     task.wait(1)
     selectTeam("Prisoner")
     task.wait(0.1)
-    return
+	CleanUpAfterRobbery()
 end
 
 RobMansion()
