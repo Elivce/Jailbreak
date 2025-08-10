@@ -271,7 +271,7 @@ local function Travel(location)
 		end 
 		task.wait()
 	end
-	FlightMove(CFrame.new(x, y, z))
+	FlightMove(location)
 	GoToGround()
 	ExitVehicle()
 end
