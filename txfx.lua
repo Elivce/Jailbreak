@@ -203,8 +203,8 @@ local FlightMove = function(pos)
 	local LagCheck = LagBackCheck(root)
 	local LagbackCount = 0
 	local speed = (InHeli() and -config['HeliSpeed']) or (vehicle and -config['VehicleSpeed']) or -config['FlightSpeed']
-	local GetPos = function() return Vector3.new(pos.x, 500, pos.z) end
-	char:PivotTo(CFrame.new(root.Position.x, 500, root.Position.z))
+	local GetPos = function() return Vector3.new(pos.x, 1000, pos.z) end
+	char:PivotTo(CFrame.new(root.Position.x, 1000, root.Position.z))
 
 	local dist = GetRoot().Position - GetPos()
 	while dist.Magnitude > 10 do	
@@ -213,7 +213,7 @@ local FlightMove = function(pos)
 		velocity = Vector3.new(velocity.x, 0, velocity.z)
 
 		GetRoot().Velocity = velocity
-		char:PivotTo(CFrame.new(root.Position.x, 500, root.Position.z))
+		char:PivotTo(CFrame.new(root.Position.x, 1000, root.Position.z))
 		task.wait()
 	end
 
