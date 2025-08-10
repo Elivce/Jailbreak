@@ -272,6 +272,7 @@ local function Travel(location)
 		task.wait()
 	end
 	FlightMove(location)
+	pos1, targetVehicle = GetVehiclePos(root.Position)
 	for i,v in pairs(targetVehicle:GetDescendants()) do
 		if v:IsA("Part") or v:IsA("MeshPart") then
 			v.CanCollide = true
