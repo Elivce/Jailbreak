@@ -71,12 +71,12 @@ getgenv().killauraloaded = true
 
 local function getPistol()
     local serverHash = getServerHash()
-    local pistolHash = getEventValue("l5cuht8e")
+    local pistolHash = getEventValue("katagsfs")
     local args = {
-        [1] = pistolHash,
-        [2] = "Pistol",
+        pistolHash,
+        "Pistol"
     }
-    game:GetService("ReplicatedStorage"):FindFirstChild(serverHash):FireServer(unpack(args))
+    game:GetService("ReplicatedStorage"):WaitForChild(serverHash):FireServer(unpack(args))
 end
 
 while wait(0.5) do
