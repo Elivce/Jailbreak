@@ -233,7 +233,7 @@ local function GoToGround()
 	end
 end
 
-local function Travel(x, y, z)
+local function Travel(location)
 	while not vehicle do
 		local pos1, targetVehicle = GetVehiclePos(root.Position)
 		FlightMove(pos1)
