@@ -58,7 +58,7 @@ local heliSpawnPos = {
 }
 
 local config = {
-	HeliSpeed = 4000,
+	HeliSpeed = 3000,
 	VehicleSpeed = 650,
 	FlightSpeed = 150,
 	PathSpeed = 45
