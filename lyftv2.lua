@@ -225,7 +225,7 @@ local function GoToGround()
 	while task.wait() do
 		local _, pos = rayCast(root.Position, rayDirs.down)
 		if pos then 
-			char:PivotTo(CFrame.new(root.Position.x, pos.y + 5, root.Position.z)) 
+			char:PivotTo(CFrame.new(root.Position.x, pos.y + 0.2, root.Position.z)) 
 			task.wait(0.3) 
 			GetRoot().Velocity = Vector3.zero 
 			return 
@@ -246,7 +246,7 @@ local function Travel(location)
 				task.wait(0.25)
 				if vehicle then 
 					for i,v in pairs(targetVehicle:GetDescendants()) do
-						if v:IsA("Part") or v:IsA("MeshPart") then
+						if v:IsA("Part") then
 							v.CanCollide = false
 						end
 					end
@@ -261,7 +261,7 @@ local function Travel(location)
 				pos1, targetVehicle = GetVehiclePos(root.Position)
 				if targetVehicle then
 					for i,v in pairs(targetVehicle:GetDescendants()) do
-						if v:IsA("Part") or v:IsA("MeshPart") then
+						if v:IsA("Part") then
 							v.CanCollide = false
 						end
 					end
@@ -272,12 +272,6 @@ local function Travel(location)
 		task.wait()
 	end
 	FlightMove(location)
-	pos1, targetVehicle = GetVehiclePos(root.Position)
-	for i,v in pairs(targetVehicle:GetDescendants()) do
-		if v:IsA("Part") or v:IsA("MeshPart") then
-			v.CanCollide = true
-		end
-	end
 	GoToGround()
 end
 
