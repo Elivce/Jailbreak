@@ -225,7 +225,7 @@ local function GoToGround()
 	while task.wait() do
 		local _, pos = rayCast(root.Position, rayDirs.down)
 		if pos then 
-			char:PivotTo(CFrame.new(root.Position.x, pos.y + 10, root.Position.z)) 
+			char:PivotTo(CFrame.new(root.Position.x, pos.y + 25, root.Position.z)) 
 			task.wait(0.3) 
 			GetRoot().Velocity = Vector3.zero 
 			return 
