@@ -303,7 +303,7 @@ local function Travel(location)
         task.wait()
     end
     FlightMove(location)
-    wait(0.5)
+    task.wait(0.5)
     GoToGround()
 end
 
