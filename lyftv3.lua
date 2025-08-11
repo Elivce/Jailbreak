@@ -58,7 +58,7 @@ local heliSpawnPos = {
 }
 
 local config = {
-    HeliSpeed = 3000,
+    HeliSpeed = 2500,
     VehicleSpeed = 650,
     FlightSpeed = 150,
     PathSpeed = 45
@@ -303,6 +303,7 @@ local function Travel(location)
         task.wait()
     end
     FlightMove(location)
+    wait(0.5)
     GoToGround()
 end
 
